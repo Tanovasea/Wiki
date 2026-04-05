@@ -8,7 +8,7 @@ const CACHE = 'wiki-v20260405';
 // Ajustează calea dacă fișierul tău HTML are alt nume
 const ASSETS = [
   './',
-  './wikitano1.html',
+  './wikitano.html',
   'https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap'
 ];
 
