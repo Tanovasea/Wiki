@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#bdb3a2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Wiki Personal">
+<title>Wiki Personal</title>
+<style>
+  :root {
+    --bg: #c8bfae;
+    --surface: #bdb3a2;
+    --surface2: #b2a896;
+    --border: #9a8e7e;
+    --accent: #6a4c2a;
+    --accent2: #3a6a7a;
+    --text: #1e1810;
+    --text-dim: #6a5a48;
+    --link: #8b2a2a;
+    --danger: #b04040;
+    --radius: 8px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: Georgia, 'Times New Roman', serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── TOPBAR ── */
+  #topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 10px; min-height: 52px;
+  }
+  #topbar .btn-icon {
+    background: none; border: none; color: var(--text-dim);
+    font-size: 22px; cursor: pointer; padding: 4px 6px;
+    border-radius: 6px; transition: color .2s, background .2s; flex-shrink: 0;
+  }
+  #topbar .btn-icon:active { background: var(--surface2); color: var(--accent); }
+
+  #topbar-center {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    overflow: hidden; min-width: 0;
+  }
+  #nav-crumb {
+    display: flex; align-items: center;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 20px; padding: 5px 12px; cursor: pointer;
+    max-width: 100%; overflow: hidden;
+    transition: background .2s, border-color .2s;
+  }
+  #nav-crumb:active { background: var(--border); border-color: var(--accent); }
+  #nav-crumb-proj {
+    font-family: monospace; font-size: 13px; font-weight: 600;
+    color: var(--accent); white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; flex-shrink: 1; min-width: 20px;
+  }
+
+  /* ── MAIN ── */
+  #main { padding: 64px 0 120px; min-height: 100vh; }
+
+  /* ── ECRAN PROIECTE (principal) ── */
+  #projects-screen {
+    display: block;
+    padding: 12px;
+  }
+  #projects-screen.hidden { display: none; }
+
+  /* ── ECRAN CITIRE ── */
+  #read-screen { display: none; }
+  #read-screen.visible { display: block; }
+
+  #view-mode { padding: 20px 18px; line-height: 1.55; font-size: 17px; }
+  #edit-mode { display: none; padding: 16px; }
+
+  /* ── FONT SIZE ── */
+  #font-controls {
+    position: fixed; right: 12px; bottom: 80px; z-index: 150;
+    display: flex; flex-direction: column; gap: 6px;
+    opacity: 0.45; transition: opacity .2s;
+  }
+  #font-controls:active { opacity: 1; }
+  .font-btn {
+    width: 38px; height: 38px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 50%; color: var(--accent);
+    font-family: monospace; font-size: 16px; font-weight: 600;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,.15);
+  }
+  .font-btn:active { background: var(--surface2); opacity: 1; }
+
+  /* context header deasupra textului */
+  .context-header {
+    font-family: monospace;
+    font-size: 11px; font-weight: 600;
+    color: var(--text-dim);
+    letter-spacing: 2px; text-transform: uppercase;
+    text-align: center;
+    padding: 0 0 16px 0;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+    opacity: .7;
+  }
+  #view-mode a {
+    color: var(--link); text-decoration: none;
+    font-weight: 600;
+    border-bottom: 2px solid rgba(139,42,42,.5);
+    transition: border-color .2s, color .2s;
+  }
+  #view-mode a:active { color: #6b1a1a; border-color: #6b1a1a; }
+  #view-mode p { margin-bottom: 1em; }
+  .hit { background: rgba(106,76,42,.15); border-radius: 3px; }
+  .hit-target { background: var(--accent); color: var(--bg); border-radius: 3px; padding: 0 2px; }
+
+  /* IMAGES */
+  .view-images { margin-top: 24px; }
+  .view-image-item { margin-bottom: 16px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .view-image-item img { width: 100%; display: block; touch-action: pan-y; }
+  .view-image-caption { font-family: Georgia, serif; font-size: 15px; color: var(--text-dim); padding: 8px 12px; background: var(--surface); font-style: italic; }
+
+  /* ── TREE ── */
+  .tree-children { display: none; }
+  .tree-children.expanded { display: block; }
+  .tree-toggle {
+    background: none; border: none; color: var(--text-dim);
+    font-size: 12px; cursor: pointer; padding: 2px 4px; flex-shrink: 0;
+    transition: transform .2s; display: inline-block; width: 18px; text-align: center;
+  }
+  .tree-toggle.open { transform: rotate(90deg); }
+  .tree-toggle.leaf { opacity: 0; pointer-events: none; }
+
+  /* ── EDIT MODE ── */
+  #title-input {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius); color: var(--accent);
+    font-family: monospace; font-size: 14px; font-weight: 600;
+    padding: 10px 12px; margin-bottom: 12px; outline: none;
+  }
+  #title-input:focus { border-color: var(--accent); }
+  #text-input {
+    width: 100%; min-height: 260px; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    color: var(--text); font-family: Georgia, serif; font-size: 18px;
+    line-height: 1.35; padding: 12px; outline: none; resize: vertical;
+  }
+  .edit-hint {
+    font-family: monospace; font-size: 11px;
+    color: var(--text-dim); margin: 8px 0 16px; line-height: 1.6;
+  }
+  .edit-hint span { color: var(--accent); }
+
+  /* LINK BUILDER */
+  #link-builder, #image-builder {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px; margin-top: 12px;
+  }
+  #link-builder h3, #image-builder h3 {
+    font-family: monospace; font-size: 11px;
+    letter-spacing: 1px; margin-bottom: 12px; text-transform: uppercase;
+  }
+  #link-builder h3 { color: var(--accent2); }
+  #image-builder h3 { color: var(--accent); }
+  .lb-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
+  .lb-input {
+    flex: 1; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-family: Georgia, serif;
+    font-size: 14px; padding: 8px 10px; outline: none;
+  }
+  .lb-input:focus { border-color: var(--accent); }
+  .lb-select {
+    flex: 1; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-family: monospace;
+    font-size: 12px; padding: 8px 10px; outline: none;
+  }
+  .lb-btn {
+    background: var(--accent); color: var(--bg);
+    border: none; border-radius: 6px; padding: 8px 14px;
+    font-family: monospace; font-size: 12px; font-weight: 600;
+    cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  }
+  .lb-btn:active { opacity: .8; }
+  .lb-btn.secondary { background: var(--accent2); }
+
+  /* IMAGE EDITOR */
+  #img-preview-list { margin-top: 10px; }
+  .img-edit-item { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; }
+  .img-edit-item img { width: 100%; max-height: 200px; object-fit: contain; display: block; background: #ccc; }
+  .img-edit-footer { display: flex; align-items: center; gap: 8px; padding: 8px 10px; }
+  .img-caption-input {
+    flex: 1; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-family: Georgia, serif;
+    font-size: 13px; padding: 6px 8px; outline: none;
+  }
+  .img-del-btn { background: none; border: none; color: var(--danger); font-size: 18px; cursor: pointer; padding: 4px; flex-shrink: 0; }
+  .img-size-row { display: flex; align-items: center; gap: 8px; padding: 0 10px 8px; }
+  .img-size-label { font-family: monospace; font-size: 10px; color: var(--text-dim); flex-shrink: 0; width: 34px; }
+  .img-size-slider { flex: 1; accent-color: var(--accent); cursor: pointer; }
+  #file-input { display: none; }
+
+  /* ── BOTTOM BAR ── */
+  #bottombar {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    background: var(--surface); border-top: 1px solid var(--border);
+    display: flex; gap: 6px; padding: 10px 10px;
+  }
+  #bottombar.hidden { display: none; }
+  .bar-btn {
+    flex: 1; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius); color: var(--text-dim);
+    font-family: monospace; font-size: 11px; font-weight: 600;
+    padding: 10px 4px; cursor: pointer; transition: all .2s; letter-spacing: .3px;
+  }
+  .bar-btn:active { background: var(--border); }
+  .bar-btn.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .bar-btn.primary:active { opacity: .85; }
+
+  /* ── PAGE ITEMS (proiecte + pagini) ── */
+  .page-item {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 10px; margin-bottom: 6px;
+    display: flex; align-items: center; gap: 8px; cursor: pointer;
+  }
+  .page-item:active { border-color: var(--accent); }
+  .page-item-title { flex: 1; font-family: Georgia, serif; font-size: 15px; color: var(--text); }
+  .page-item-meta { font-family: monospace; font-size: 10px; color: var(--text-dim); }
+  .page-item-del { background: none; border: none; color: var(--text-dim); font-size: 18px; cursor: pointer; padding: 4px; flex-shrink: 0; }
+  .page-item-del:active { color: var(--danger); }
+  .page-item.active-project { border-color: var(--accent); background: var(--surface2); }
+  .page-item.active-project .page-item-title { color: var(--accent); font-weight: 600; }
+  .page-item.current-page { border-left: 3px solid var(--accent); }
+  .page-item.current-page .page-item-title { color: var(--accent); }
+  .drag-handle { color: var(--text-dim); font-size: 14px; flex-shrink: 0; padding: 2px 4px; opacity: .5; cursor: grab; user-select: none; }
+  .drag-handle:active { opacity: 1; cursor: grabbing; }
+  .drop-before { box-shadow: 0 -3px 0 0 var(--accent) !important; }
+  .drop-after  { box-shadow: 0  3px 0 0 var(--accent) !important; }
+
+  /* footer creare proiect */
+  #proj-footer {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    background: var(--surface); border-top: 1px solid var(--border);
+    padding: 10px 12px; display: block;
+  }
+  #proj-footer.hidden { display: none; }
+  #proj-footer-locked { display: none; }
+  .overlay-input {
+    flex: 1; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius); color: var(--text);
+    font-family: Georgia, serif; font-size: 14px; padding: 10px 12px; outline: none;
+  }
+  .overlay-input:focus { border-color: var(--accent); }
+
+  /* ── SEARCH OVERLAY ── */
+  .overlay {
+    display: none; position: fixed; inset: 0; z-index: 200;
+    background: var(--bg); flex-direction: column;
+  }
+  .overlay.open { display: flex; animation: slideUp .22s ease-out; }
+  @keyframes slideUp {
+    from { transform: translateY(18px); opacity: .6; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+  .overlay-header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 12px 14px; display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+  }
+  .overlay-body { flex: 1; overflow-y: auto; padding: 12px; }
+
+  #search-input-field {
+    flex: 1; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius); color: var(--text);
+    font-family: Georgia, serif; font-size: 15px; padding: 10px 12px; outline: none;
+  }
+  #search-input-field:focus { border-color: var(--accent); }
+  .sr-item {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px;
+  }
+  .sr-title {
+    font-family: monospace; font-size: 12px;
+    color: var(--accent); font-weight: 600; margin-bottom: 6px; cursor: pointer;
+  }
+  .sr-snippet {
+    font-family: Georgia, serif; font-size: 14px; color: var(--text);
+    line-height: 1.5; cursor: pointer; padding: 4px 0;
+  }
+  .sr-snippet + .sr-snippet { margin-top: 4px; padding-top: 6px; border-top: 1px dashed var(--border); }
+  .sr-snippet mark { background: var(--accent); color: var(--bg); border-radius: 3px; padding: 0 2px; }
+  .sr-count { font-family: monospace; font-size: 10px; color: var(--text-dim); margin-left: 8px; }
+
+  /* ── CONFIRM DIALOG ── */
+  #confirm-overlay {
+    display: none; position: fixed; inset: 0; z-index: 700;
+    background: rgba(0,0,0,.6); align-items: center; justify-content: center; padding: 20px;
+  }
+  #confirm-overlay.open { display: flex; }
+  #confirm-box {
+    background: var(--surface); border: 2px solid var(--danger);
+    border-radius: 12px; padding: 20px; max-width: 320px; width: 100%;
+    text-align: center;
+  }
+  #confirm-icon { font-size: 36px; display: block; margin-bottom: 10px; }
+  #confirm-title {
+    font-family: monospace; font-size: 13px;
+    color: var(--danger); font-weight: 600; margin-bottom: 8px;
+  }
+  #confirm-message {
+    font-family: Georgia, serif; font-size: 15px; color: var(--text);
+    margin-bottom: 20px; line-height: 1.5;
+  }
+  .confirm-btns { display: flex; gap: 10px; justify-content: center; }
+  .confirm-btn-yes {
+    flex: 1; background: var(--danger); color: #fff; border: none;
+    border-radius: 8px; padding: 12px; font-family: monospace;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .confirm-btn-no {
+    flex: 1; background: var(--surface2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px; font-family: monospace;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+
+  /* LONG PRESS */
+  .lp-btn { position: relative; overflow: hidden; }
+  .lp-btn::after {
+    content: ''; position: absolute; inset: 0;
+    background: rgba(176,64,64,.0); border-radius: 4px;
+    transition: background .6s;
+  }
+  .lp-btn.pressing::after { background: rgba(176,64,64,.35); }
+
+  /* EDIT BANNER */
+  #edit-banner {
+    display: none; background: #3a1a0a; color: #f0c090;
+    font-family: monospace; font-size: 11px;
+    padding: 6px 14px; text-align: center;
+  }
+  #edit-banner.open { display: block; }
+
+  /* STORAGE */
+  #storage-bar {
+    display: none; position: fixed; top: 52px; left: 0; right: 0; z-index: 99;
+    background: #3a1a0a; padding: 5px 14px; align-items: center; gap: 8px;
+  }
+  #backup-banner {
+    display: none; position: fixed; top: 52px; left: 0; right: 0; z-index: 98;
+    background: #2a4a2a; padding: 8px 14px; align-items: center; gap: 10px;
+  }
+
+  /* EMPTY */
+  .empty-state {
+    text-align: center; padding: 60px 30px;
+    color: var(--text-dim); font-family: monospace; font-size: 13px; line-height: 2;
+  }
+  .empty-state .big { font-size: 40px; display: block; margin-bottom: 16px; }
+
+  /* TOAST */
+  #toast {
+    position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); font-family: monospace; font-size: 12px;
+    padding: 10px 18px; border-radius: 20px; opacity: 0;
+    transition: all .3s; pointer-events: none; white-space: nowrap; z-index: 300;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  /* BARA MICA JOS DREAPTA - cauta mod blocat */
+  #search-bar-small {
+    display: none;
+    position: fixed; bottom: 16px; right: 16px; z-index: 150;
+  }
+  #search-bar-small button {
+    width: 46px; height: 46px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 50%; font-size: 22px; cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,.2);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #search-bar-small button:active { background: var(--surface2); }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div id="topbar">
+  <button class="btn-icon" id="btn-home" onclick="goHome()" title="Proiecte">🗂</button>
+  <div id="topbar-center">
+    <div id="nav-crumb" onclick="goHome()">
+      <span id="nav-crumb-proj"></span>
+    </div>
+  </div>
+  <button class="btn-icon" id="btn-lock" onclick="toggleLock()" title="Blocare editări">🔓</button>
+  <button class="btn-icon" id="btn-back" onclick="goBack()" style="opacity:.4">◀</button>
+  <button class="btn-icon" id="btn-fwd" onclick="goForward()" style="opacity:.4">▶</button>
+</div>
+
+<div id="main">
+
+  <!-- ECRAN PRINCIPAL: LISTA PROIECTE + PAGINI -->
+  <div id="projects-screen">
+    <div id="projects-list"></div>
+  </div>
+
+  <!-- ECRAN CITIRE/EDITARE -->
+  <div id="read-screen">
+    <div id="edit-banner">⚠️ Mod editare activ — apasă <strong>✕</strong> pentru a ieși fără să salvezi</div>
+    <div id="view-mode"></div>
+    <div id="edit-mode">
+      <input id="title-input" type="text" placeholder="Titlul paginii…" />
+      <div class="edit-hint">
+        Link wiki: <span>[[text|Pagina]]</span> &nbsp;·&nbsp; Cross-proiect: <span>[[text|Proiect::Pagina]]</span>
+      </div>
+      <textarea id="text-input" placeholder="Scrie conținutul paginii aici…"></textarea>
+      <div id="link-builder">
+        <h3>🔗 Constructor de Linkuri</h3>
+        <div class="lb-row">
+          <input class="lb-input" id="lb-text" placeholder="Textul clicabil…" />
+        </div>
+        <div class="lb-row">
+          <select class="lb-select" id="lb-proj" onchange="populateLbSelect()">
+            <option value="">→ proiect…</option>
+          </select>
+          <select class="lb-select" id="lb-target">
+            <option value="">→ pagina…</option>
+          </select>
+        </div>
+        <div class="lb-row">
+          <input class="lb-input" id="lb-anchor" placeholder="Cuvânt țintă în pagină (opțional)…" />
+        </div>
+        <div class="lb-row">
+          <button class="lb-btn" onclick="insertLink()">Inserează link</button>
+          <button class="lb-btn secondary" onclick="insertLinkNewPage()">+ Pagină nouă</button>
+        </div>
+      </div>
+      <div id="image-builder">
+        <h3>🖼 Imagini / Schițe</h3>
+        <div class="lb-row">
+          <button class="lb-btn" onclick="document.getElementById('file-input').click()">📁 Adaugă imagine din galerie</button>
+        </div>
+        <input type="file" id="file-input" accept="image/*" multiple onchange="handleImageUpload(event)" />
+        <div id="img-preview-list"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- BOTTOM BAR citire/editare -->
+<div id="bottombar">
+  <button class="bar-btn" id="btn-edit" onclick="toggleEdit()">Editează</button>
+  <button class="bar-btn primary" id="btn-save" onclick="savePage()" style="display:none">💾 Salvează</button>
+  <button class="bar-btn" id="btn-cancel" onclick="cancelEdit()" style="display:none">✕</button>
+  <button class="bar-btn" id="btn-search-read" onclick="openSearch()">🔍 Caută</button>
+</div>
+
+<!-- BARA MICA JOS DREAPTA - cauta (mod blocat, oriunde) -->
+<div id="search-bar-small">
+  <button onclick="openSearch()">🔍</button>
+</div>
+
+<!-- FOOTER PROIECTE MOD EDITARE -->
+<div id="proj-footer">
+  <div style="display:flex;gap:6px;margin-bottom:6px;">
+    <input class="overlay-input" id="new-project-input" placeholder="Nume proiect nou…" />
+    <button class="lb-btn" onclick="createProject()" style="flex-shrink:0;">+ Creează</button>
+  </div>
+  <div style="display:flex;gap:6px;">
+    <button class="bar-btn" onclick="openSearch()" style="flex:1;font-size:13px;">🔍 Caută</button>
+    <button class="bar-btn" style="flex:1;font-size:13px;background:var(--accent2);color:var(--bg);border-color:var(--accent2);" onclick="exportWiki()">📤 Export</button>
+    <button class="bar-btn" style="flex:1;font-size:13px;" onclick="document.getElementById('import-input').click()">📥 Import</button>
+    <input type="file" id="import-input" accept=".json" style="display:none" onchange="importWiki(event)" />
+  </div>
+</div>
+
+<!-- FOOTER PROIECTE MOD CITIRE - gol, nu apare -->
+<div id="proj-footer-locked" style="display:none;"></div>
+
+<!-- FONT CONTROLS -->
+<div id="font-controls">
+  <button class="font-btn" onclick="changeFontSize(1)">A+</button>
+  <button class="font-btn" onclick="changeFontSize(-1)">A-</button>
+</div>
+
+<!-- SEARCH OVERLAY -->
+<div id="search-overlay" class="overlay">
+  <div class="overlay-header">
+    <input id="search-input-field" type="text" placeholder="Caută în toate paginile…" onkeydown="if(event.key==='Enter') doSearchNow()" />
+    <button class="lb-btn" onclick="doSearchNow()" style="flex-shrink:0;">Caută</button>
+    <button class="btn-icon" onclick="closeSearch()" style="font-size:18px;">✕</button>
+  </div>
+  <div class="overlay-body" id="search-results">
+    <div class="empty-state">Scrie un cuvânt și apasă <strong>Caută</strong>.</div>
+  </div>
+</div>
+
+<!-- STORAGE WARNING -->
+<div id="storage-bar">
+  <div id="storage-fill" style="height:5px;border-radius:3px;background:var(--accent2);transition:width .3s;min-width:4px;"></div>
+  <span id="storage-label" style="font-family:monospace;font-size:10px;color:#f0c090;white-space:nowrap;flex-shrink:0;"></span>
+  <button onclick="exportWiki()" style="background:#6a4c2a;border:none;color:#f0d8bc;font-family:monospace;font-size:10px;padding:2px 8px;border-radius:4px;cursor:pointer;flex-shrink:0;">Export acum</button>
+</div>
+
+<!-- BACKUP REMINDER -->
+<div id="backup-banner">
+  <span id="backup-label" style="font-family:monospace;font-size:11px;color:#b0d8b0;flex:1;">📦 Nu ai făcut backup de mult timp.</span>
+  <button onclick="exportWiki();dismissBackupReminder()" style="background:#3a7a3a;border:none;color:#e0f0e0;font-family:monospace;font-size:10px;padding:4px 10px;border-radius:4px;cursor:pointer;flex-shrink:0;">📤 Export</button>
+  <button onclick="dismissBackupReminder()" style="background:none;border:none;color:#7ab07a;font-size:16px;cursor:pointer;flex-shrink:0;padding:0 4px;">✕</button>
+</div>
+
+<!-- CONFIRM DIALOG -->
+<div id="confirm-overlay">
+  <div id="confirm-box">
+    <span id="confirm-icon">⚠️</span>
+    <div id="confirm-title">ATENȚIE!</div>
+    <div id="confirm-message"></div>
+    <div class="confirm-btns">
+      <button class="confirm-btn-no" onclick="confirmNo()">✕ Anulează</button>
+      <button class="confirm-btn-yes" id="confirm-yes-btn" onclick="confirmYes()">✓ Confirmă</button>
+    </div>
+  </div>
+</div>
+
+<!-- PASSWORD DIALOG -->
+<div id="pass-overlay" style="display:none;position:fixed;inset:0;z-index:700;background:rgba(0,0,0,.6);align-items:center;justify-content:center;padding:20px;">
+  <div style="background:var(--surface);border:2px solid var(--accent);border-radius:12px;padding:24px;max-width:280px;width:100%;text-align:center;">
+    <div style="font-size:32px;margin-bottom:10px;">🔐</div>
+    <div style="font-family:monospace;font-size:13px;color:var(--accent);font-weight:600;margin-bottom:16px;">DEBLOCHEAZĂ</div>
+    <input id="pass-input" type="password" maxlength="3"
+      style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+             color:var(--text);font-family:monospace;font-size:28px;font-weight:600;
+             padding:12px;outline:none;text-align:center;letter-spacing:8px;margin-bottom:8px;"
+      placeholder="···"
+      oninput="if(this.value.length===3) submitPass()"
+      onkeydown="if(event.key==='Enter') submitPass()" />
+    <div id="pass-error" style="font-family:monospace;font-size:11px;color:var(--danger);min-height:18px;margin-bottom:12px;"></div>
+    <button onclick="closePassDialog()" style="width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:monospace;font-size:13px;font-weight:600;cursor:pointer;">✕ Anulează</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── INDEXEDDB ──
+const DB_NAME='WikiPersonalDB', DB_VERSION=1, STORE_NAME='wiki_data';
+var db=null;
+function openDB(){
+  return new Promise(function(resolve,reject){
+    if(db){resolve(db);return;}
+    var req=indexedDB.open(DB_NAME,DB_VERSION);
+    req.onupgradeneeded=function(e){var d=e.target.result;if(!d.objectStoreNames.contains(STORE_NAME))d.createObjectStore(STORE_NAME);};
+    req.onsuccess=function(e){db=e.target.result;resolve(db);};
+    req.onerror=function(e){reject(e);};
+  });
+}
+function idbGet(key){return openDB().then(function(d){return new Promise(function(resolve){var tx=d.transaction(STORE_NAME,'readonly');var req=tx.objectStore(STORE_NAME).get(key);req.onsuccess=function(){resolve(req.result);};req.onerror=function(){resolve(null);};});});}
+function idbSet(key,value){return openDB().then(function(d){return new Promise(function(resolve,reject){var tx=d.transaction(STORE_NAME,'readwrite');var req=tx.objectStore(STORE_NAME).put(value,key);req.onsuccess=function(){resolve();};req.onerror=function(e){reject(e);};});});}
+
+// ── LOCALSTORAGE HELPERS ──
+const ACTIVE_KEY='wiki_active_project_v1', PROJECTS_ORDER_KEY='wiki_projects_order_v1';
+function loadActiveProject(){return localStorage.getItem(ACTIVE_KEY)||null;}
+function saveActiveProject(n){localStorage.setItem(ACTIVE_KEY,n);}
+function loadProjectsOrder(){try{return JSON.parse(localStorage.getItem(PROJECTS_ORDER_KEY))||[];}catch{return [];}}
+function saveProjectsOrder(o){localStorage.setItem(PROJECTS_ORDER_KEY,JSON.stringify(o));}
+function saveLastPage(t){localStorage.setItem('wiki_last_'+activeProject,t);}
+function loadLastPage(){return localStorage.getItem('wiki_last_'+activeProject)||null;}
+function saveLastInNode(proj,node,page){localStorage.setItem('wiki_node_'+proj+'__'+node,page);}
+function loadLastInNode(proj,node){return localStorage.getItem('wiki_node_'+proj+'__'+node)||null;}
+
+// ── STORAGE ──
+function saveProjects(p){allProjects=p;idbSet('allProjects',JSON.stringify(p)).then(function(){checkStorageWarning();});}
+function loadProjectsFromIDB(){return idbGet('allProjects').then(function(val){if(val){try{return JSON.parse(val);}catch(e){return null;}}return null;});}
+
+function requestPersistentStorage(){
+  if(navigator.storage&&navigator.storage.persist){
+    navigator.storage.persisted().then(function(already){
+      if(!already)navigator.storage.persist().then(function(granted){if(granted)localStorage.setItem('wiki_storage_persistent','1');});
+    });
+  }
+}
+
+function checkStorageWarning(){
+  var size=JSON.stringify(allProjects).length*2;
+  var limitMB=100; var pct=Math.round(size/(limitMB*1024*1024)*100);
+  var bar=document.getElementById('storage-bar');
+  var fill=document.getElementById('storage-fill');
+  var lbl=document.getElementById('storage-label');
+  if(!bar)return;
+  var mb=(size/(1024*1024)).toFixed(1);
+  if(pct>=60){bar.style.display='flex';fill.style.width=Math.min(pct,100)+'%';fill.style.background=pct>=85?'#b04040':'#b07030';lbl.textContent='Spațiu: '+mb+'MB'+(pct>=85?' — Export acum!':'');}
+  else{bar.style.display='none';}
+}
+
+function getProjectsOrdered(){
+  var order=loadProjectsOrder();
+  var keys=Object.keys(allProjects);
+  keys.forEach(function(k){if(order.indexOf(k)===-1)order.push(k);});
+  order=order.filter(function(k){return allProjects[k]!==undefined;});
+  return order;
+}
+
+// ── BACKUP REMINDER ──
+function saveLastExportTime(){localStorage.setItem('wiki_last_export',Date.now().toString());}
+function loadLastExportTime(){return parseInt(localStorage.getItem('wiki_last_export')||'0');}
+function dismissBackupReminder(){var b=document.getElementById('backup-banner');if(b)b.style.display='none';}
+function checkBackupReminder(){
+  var last=loadLastExportTime();var now=Date.now();var DAY=86400000;
+  var days=last?Math.floor((now-last)/DAY):null;
+  var banner=document.getElementById('backup-banner');var label=document.getElementById('backup-label');
+  if(!banner)return;
+  var show=(last===0)||(days!==null&&days>=7);
+  if(show){var msg=last===0?'📦 Nu ai făcut niciodată un backup. Exportă!':'📦 Ultimul backup acum '+days+(days===1?' zi.':' zile.');if(label)label.textContent=msg;banner.style.display='flex';}
+}
+
+// ── HELPERS ──
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function escJs(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+function norm(s){return String(s).replace(/[șŞşŠš]/g,'s').replace(/[țŢţ]/g,'t').replace(/[ăÂâĂ]/g,'a').replace(/[îÎ]/g,'i').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();}
+
+// ── STATE ──
+var allProjects={}, activeProject='', pages={}, current=null, editing=false, editImages=[];
+var onHomeScreen=true;
+
+function getPages(){return allProjects[activeProject]||{};}
+function setPages(p){allProjects[activeProject]=p;saveProjects(allProjects);}
+
+// ── SCREEN MANAGEMENT ──
+function goHome(){
+  if(editing){toast('Salvează sau anulează mai întâi.');return;}
+  onHomeScreen=true;
+  document.getElementById('projects-screen').classList.remove('hidden');
+  document.getElementById('read-screen').classList.remove('visible');
+  document.getElementById('bottombar').classList.add('hidden');
+  document.getElementById('font-controls').style.display='none';
+  document.getElementById('nav-crumb-proj').textContent=activeProject||'';
+  // proiectele apar NEEXPANDATE la revenire
+  expandedProjects={};
+  renderProjectsList();
+  applyLockStateToHome();
+}
+
+function showReadScreen(){
+  onHomeScreen=false;
+  document.getElementById('projects-screen').classList.add('hidden');
+  document.getElementById('read-screen').classList.add('visible');
+  document.getElementById('proj-footer').classList.add('hidden');
+  document.getElementById('font-controls').style.display='';
+  applyLockStateToRead();
+}
+
+function applyLockStateToHome(){
+  var footer=document.getElementById('proj-footer');
+  var searchSmall=document.getElementById('search-bar-small');
+  if(footer) footer.style.display=editLocked?'none':'block';
+  if(searchSmall) searchSmall.style.display=editLocked?'':'none';
+  renderProjectsList();
+}
+
+function applyLockStateToRead(){
+  var bottombar=document.getElementById('bottombar');
+  var searchSmall=document.getElementById('search-bar-small');
+  if(editLocked){
+    // mod blocat: ascunde bottombar, arata bara mica dreapta
+    bottombar.classList.add('hidden');
+    if(searchSmall) searchSmall.style.display='';
+    if(editing)cancelEdit();
+  } else {
+    // mod deblocat: arata bottombar cu Editează + Caută
+    bottombar.classList.remove('hidden');
+    document.getElementById('btn-edit').style.display='';
+    document.getElementById('btn-save').style.display='none';
+    document.getElementById('btn-cancel').style.display='none';
+    document.getElementById('btn-search-read').style.display='';
+    if(searchSmall) searchSmall.style.display='none';
+  }
+}
+
+// ── NAVIGARE ──
+function firstPageInNode(node,projPages){
+  if(projPages[node.title])return node.title;
+  if(node.children){for(var i=0;i<node.children.length;i++){var f=firstPageInNode(node.children[i],projPages);if(f)return f;}}
+  return null;
+}
+function isDescendant(title,node){
+  if(node.title===title)return true;
+  if(node.children){for(var i=0;i<node.children.length;i++){if(isDescendant(title,node.children[i]))return true;}}
+  return false;
+}
+
+function getTree(){
+  var proj=allProjects[activeProject];
+  if(!proj)return[];
+  if(!proj.__tree__){var old=proj.__order__||[];proj.__tree__=old.map(function(t){return{title:t,children:[]};});}
+  return proj.__tree__;
+}
+function saveTree(tree){if(!allProjects[activeProject])return;allProjects[activeProject].__tree__=tree;saveProjects(allProjects);}
+
+function getPageOrder(){
+  var result=[];
+  function walk(nodes){nodes.forEach(function(n){if(pages[n.title])result.push(n.title);if(n.children&&n.children.length)walk(n.children);});}
+  walk(getTree());
+  Object.keys(pages).forEach(function(k){if(k!=='__order__'&&k!=='__tree__'&&result.indexOf(k)===-1)result.push(k);});
+  return result;
+}
+
+function findNode(title,nodes,parent){
+  for(var i=0;i<nodes.length;i++){
+    if(nodes[i].title===title)return{node:nodes[i],parent:parent,siblings:nodes,idx:i};
+    if(nodes[i].children&&nodes[i].children.length){var found=findNode(title,nodes[i].children,nodes[i]);if(found)return found;}
+  }
+  return null;
+}
+
+function findRootTitle(title){
+  function findRoot(nodes,target){
+    for(var i=0;i<nodes.length;i++){
+      if(nodes[i].title===target)return nodes[i].title;
+      if(nodes[i].children&&nodes[i].children.length&&isDescendant(target,nodes[i]))return nodes[i].title;
+    }
+    return null;
+  }
+  return findRoot(getTree(),title);
+}
+
+function findParentTitle(title){var found=findNode(title,getTree(),null);return(found&&found.parent)?found.parent.title:null;}
+
+function updateNavBtns(){
+  var order=getPageOrder();var idx=order.indexOf(current);
+  document.getElementById('btn-back').style.opacity=(idx>0)?'1':'.4';
+  document.getElementById('btn-fwd').style.opacity=(idx>=0&&idx<order.length-1)?'1':'.4';
+}
+
+function updateCrumb(title){
+  var el=document.getElementById('nav-crumb-proj');
+  if(!title){el.textContent=activeProject||'';return;}
+  var root=findRootTitle(title);
+  el.textContent=(root&&root!==title)?root:title;
+}
+
+function navigate(title){
+  if(editing){toast('Salvează sau anulează mai întâi.');return;}
+  if(!pages[title]){
+    pages[title]={content:'',images:[],updated:Date.now()};setPages(pages);
+    var tree=getTree();if(!findNode(title,tree,null)){tree.push({title:title,children:[]});saveTree(tree);}
+    toast('Pagină nouă creată: '+title);
+  }
+  // auto-redirect la pagini goale cu copii
+  var pg=pages[title];
+  var hasContent=(pg.content&&pg.content.trim().length>0)||(pg.images&&pg.images.length>0);
+  if(!hasContent){
+    var fn=findNode(title,getTree(),null);
+    if(fn&&fn.node.children&&fn.node.children.length>0){
+      var lastIn=loadLastInNode(activeProject,title);
+      if(lastIn&&pages[lastIn]&&isDescendant(lastIn,fn.node)&&lastIn!==title){navigate(lastIn);return;}
+      var fc=firstPageInNode(fn.node.children[0],pages);
+      if(fc&&fc!==title){navigate(fc);return;}
+    }
+  }
+  current=title;saveLastPage(title);
+  (function saveParents(nodes){nodes.forEach(function(n){if(isDescendant(title,n)){saveLastInNode(activeProject,n.title,title);if(n.children&&n.children.length)saveParents(n.children);}});})(getTree());
+  updateCrumb(title);updateNavBtns();
+  document.getElementById('view-mode').style.display='block';
+  document.getElementById('edit-mode').style.display='none';
+  editing=false;showViewBtns();renderView(title);
+  showReadScreen();window.scrollTo(0,0);
+}
+
+function navigateDirect(title){
+  if(editing){toast('Salvează sau anulează mai întâi.');return;}
+  if(!pages[title])return;
+  current=title;saveLastPage(title);
+  (function saveParents(nodes){nodes.forEach(function(n){if(isDescendant(title,n)){saveLastInNode(activeProject,n.title,title);if(n.children&&n.children.length)saveParents(n.children);}});})(getTree());
+  updateCrumb(title);updateNavBtns();
+  document.getElementById('view-mode').style.display='block';
+  document.getElementById('edit-mode').style.display='none';
+  editing=false;showViewBtns();renderView(title);
+  showReadScreen();window.scrollTo(0,0);
+}
+
+function goBack(){var order=getPageOrder();var idx=order.indexOf(current);if(idx<=0){toast('Ești la prima pagină.');return;}navigateDirect(order[idx-1]);}
+function goForward(){var order=getPageOrder();var idx=order.indexOf(current);if(idx<0||idx>=order.length-1){toast('Ești la ultima pagină.');return;}navigateDirect(order[idx+1]);}
+
+function navigateToMatch(title,query,idx){
+  if(editing){toast('Salvează sau anulează mai întâi.');return;}
+  if(!pages[title])return;
+  current=title;saveLastPage(title);updateCrumb(title);updateNavBtns();
+  document.getElementById('view-mode').style.display='block';
+  document.getElementById('edit-mode').style.display='none';
+  editing=false;showViewBtns();closeSearch();renderView(title,query,idx);
+  showReadScreen();
+}
+
+// ── RENDER VIEW ──
+function findAllHitsInOriginal(original,ql){
+  var on=norm(original);var hits=[];var np=0;
+  while((np=on.indexOf(ql,np))!==-1){
+    var origStart=0;var ni=0;
+    while(ni<np&&origStart<original.length){ni+=norm(original[origStart]).length;origStart++;}
+    var origEnd=origStart;var ni2=np;
+    while(ni2<np+ql.length&&origEnd<original.length){ni2+=norm(original[origEnd]).length;origEnd++;}
+    hits.push({start:origStart,len:origEnd-origStart});np+=ql.length;
+  }
+  return hits;
+}
+
+function isFileLink(tgt){return false;}
+
+function parseLink(tgt){
+  var proj=activeProject;var page=tgt;var anchor='';
+  if(tgt.indexOf('::')!==-1){var pp=tgt.split('::');proj=pp[0].trim();page=pp[1]||'';}
+  if(page.indexOf('#')!==-1){var ap=page.split('#');page=ap[0].trim();anchor=ap[1].trim();}
+  return{proj:proj,page:page,anchor:anchor};
+}
+
+function navigateLink(tgt){
+  var p=parseLink(tgt);
+  if(p.proj!==activeProject){activeProject=p.proj;saveActiveProject(p.proj);pages=getPages();current=null;}
+  if(p.anchor){navigateToMatch(p.page,p.anchor,0);}else{navigate(p.page);}
+  return false;
+}
+
+function renderView(title,hlQuery,hlIndex){
+  const page=pages[title];
+  const el=document.getElementById('view-mode');
+  if(!page){el.innerHTML='<div class="empty-state"><span class="big">🔍</span>Pagina nu există.</div>';return;}
+  let html=(page.content||'')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\n/g,'<br>')
+    .replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g,function(_,txt,tgt){var p=parseLink(tgt);var style=(p.proj!==activeProject)?' style="color:#3a6a7a;border-bottom-color:rgba(58,106,122,.5);"':'';return'<a href="#" onclick="navigateLink(\''+escJs(tgt)+'\');return false;"'+style+'>'+escHtml(txt)+'</a>';})
+    .replace(/\[\[([^\]]+)\]\]/g,function(_,tgt){var p=parseLink(tgt);var style=(p.proj!==activeProject)?' style="color:#3a6a7a;border-bottom-color:rgba(58,106,122,.5);"':'';return'<a href="#" onclick="navigateLink(\''+escJs(tgt)+'\');return false;"'+style+'>'+escHtml(tgt)+'</a>';});
+  if(hlQuery){
+    var ql=norm(hlQuery);var hitsInHtml=findAllHitsInOriginal(html,ql);
+    var out='';var offset=0;
+    hitsInHtml.forEach(function(h,hidx){out+=html.slice(offset,h.start);var cls=(hidx===hlIndex)?'hit hit-target':'hit';out+='<span class="'+cls+'" id="hit'+hidx+'">'+html.slice(h.start,h.start+h.len)+'</span>';offset=h.start+h.len;});
+    out+=html.slice(offset);html=out;
+  }
+  let imgsHtml='';
+  if(page.images&&page.images.length){imgsHtml='<div class="view-images">'+page.images.map(img=>'<div class="view-image-item" style="text-align:center;"><img src="'+img.data+'" style="width:'+(img.size||100)+'%;max-width:100%;" />'+(img.caption?'<div class="view-image-caption">'+escHtml(img.caption)+'</div>':'')+' </div>').join('')+'</div>';}
+  var rootTitle=findRootTitle(title);var isRoot=(rootTitle===title);
+  var contextHeader='';if(!isRoot){contextHeader='<div class="context-header">'+escHtml(title)+'</div>';}
+  el.innerHTML=contextHeader+(html||'<em style="color:var(--text-dim)">Pagină goală.</em>')+imgsHtml;
+  if(hlQuery!==undefined){setTimeout(function(){var t=document.getElementById('hit'+(hlIndex||0));if(t)t.scrollIntoView({behavior:'smooth',block:'center'});},100);}
+}
+
+// ── LOCK ──
+var editLocked=false;
+function loadLockState(){return localStorage.getItem('wiki_locked')==='1';}
+function saveLockState(v){localStorage.setItem('wiki_locked',v?'1':'0');}
+var UNLOCK_PASS='144';
+
+function applyLockState(){
+  var btn=document.getElementById('btn-lock');
+  if(btn){btn.textContent=editLocked?'🔒':'🔓';btn.style.opacity=editLocked?'1':'.6';}
+  if(onHomeScreen){applyLockStateToHome();}else{applyLockStateToRead();}
+}
+
+function toggleLock(){
+  if(!editLocked){editLocked=true;saveLockState(true);applyLockState();toast('🔒 Mod citire activat');}
+  else{openPassDialog();}
+}
+function openPassDialog(){var o=document.getElementById('pass-overlay');var i=document.getElementById('pass-input');var e=document.getElementById('pass-error');o.style.display='flex';e.textContent='';i.value='';setTimeout(function(){i.focus();},120);}
+function closePassDialog(){document.getElementById('pass-overlay').style.display='none';document.getElementById('pass-input').value='';document.getElementById('pass-error').textContent='';}
+function submitPass(){var val=document.getElementById('pass-input').value;if(val===UNLOCK_PASS){closePassDialog();editLocked=false;saveLockState(false);applyLockState();toast('🔓 Mod editare activat');}else{var err=document.getElementById('pass-error');err.textContent='Parolă incorectă.';document.getElementById('pass-input').value='';setTimeout(function(){document.getElementById('pass-input').focus();},50);}}
+
+// ── FONT SIZE ──
+var FONT_SIZES=[13,15,17,19,21,24];var fontIdx=2;
+function initFontSize(){var saved=parseInt(localStorage.getItem('wiki_font_idx')||'2');fontIdx=Math.max(0,Math.min(FONT_SIZES.length-1,saved));applyFontSize();}
+function applyFontSize(){document.getElementById('view-mode').style.fontSize=FONT_SIZES[fontIdx]+'px';}
+function changeFontSize(delta){fontIdx=Math.max(0,Math.min(FONT_SIZES.length-1,fontIdx+delta));localStorage.setItem('wiki_font_idx',fontIdx);applyFontSize();toast('Font: '+FONT_SIZES[fontIdx]+'px');}
+
+// ── EDIT ──
+function toggleEdit(){
+  if(editLocked){toast('🔒 Editările sunt blocate.');return;}
+  if(!current){toast('Deschide o pagină mai întâi.');return;}
+  editing=true;
+  var page=pages[current]||{content:'',images:[]};
+  document.getElementById('title-input').value=current;
+  document.getElementById('text-input').value=page.content||'';
+  editImages=(page.images||[]).map(function(i){return Object.assign({},i);});
+  document.getElementById('view-mode').style.display='none';
+  document.getElementById('edit-mode').style.display='block';
+  populateLbProjects();renderImgPreview();showEditBtns();window.scrollTo(0,0);
+}
+function cancelEdit(){editing=false;editImages=[];document.getElementById('view-mode').style.display='block';document.getElementById('edit-mode').style.display='none';showViewBtns();}
+function showViewBtns(){
+  if(editLocked){
+    document.getElementById('bottombar').classList.add('hidden');
+    var ss=document.getElementById('search-bar-small');if(ss)ss.style.display='';
+  } else {
+    document.getElementById('bottombar').classList.remove('hidden');
+    document.getElementById('btn-edit').style.display='';
+    document.getElementById('btn-save').style.display='none';
+    document.getElementById('btn-cancel').style.display='none';
+    document.getElementById('btn-search-read').style.display='';
+    var ss=document.getElementById('search-bar-small');if(ss)ss.style.display='none';
+  }
+  document.getElementById('edit-banner').classList.remove('open');
+}
+function showEditBtns(){
+  document.getElementById('bottombar').classList.remove('hidden');
+  document.getElementById('btn-edit').style.display='none';
+  document.getElementById('btn-save').style.display='';
+  document.getElementById('btn-cancel').style.display='';
+  document.getElementById('btn-search-read').style.display='none';
+  var ss=document.getElementById('search-bar-small');if(ss)ss.style.display='none';
+  document.getElementById('edit-banner').classList.add('open');
+}
+
+function savePage(){
+  var newTitle=document.getElementById('title-input').value.trim();
+  var newContent=document.getElementById('text-input').value;
+  if(!newTitle){toast('Adaugă un titlu!');return;}
+  document.querySelectorAll('.img-caption-input').forEach(function(inp,i){if(editImages[i])editImages[i].caption=inp.value;});
+  document.querySelectorAll('.img-size-slider').forEach(function(sl,i){if(editImages[i])editImages[i].size=parseInt(sl.value);});
+  var tree=getTree();
+  if(newTitle!==current&&current){var node=findNode(current,tree,null);if(node)node.node.title=newTitle;delete pages[current];saveTree(tree);}
+  else if(!findNode(newTitle,tree,null)){tree.push({title:newTitle,children:[]});saveTree(tree);}
+  pages[newTitle]={content:newContent,images:editImages,updated:Date.now()};setPages(pages);
+  current=newTitle;editing=false;editImages=[];
+  document.getElementById('view-mode').style.display='block';
+  document.getElementById('edit-mode').style.display='none';
+  showViewBtns();renderView(newTitle);toast('✓ Salvat');
+}
+
+// ── IMAGES ──
+function handleImageUpload(event){
+  var files=Array.from(event.target.files);if(!files.length)return;var loaded=0;
+  files.forEach(function(file){var reader=new FileReader();reader.onload=function(e){editImages.push({data:e.target.result,caption:'',size:100});loaded++;if(loaded===files.length){renderImgPreview();toast(files.length+' imagine(i) adăugate ✓');}};reader.readAsDataURL(file);});
+  event.target.value='';
+}
+function renderImgPreview(){
+  var c=document.getElementById('img-preview-list');if(!editImages.length){c.innerHTML='';return;}
+  c.innerHTML=editImages.map(function(img,i){return'<div class="img-edit-item"><div style="text-align:center;background:#ccc;padding:8px;"><img src="'+img.data+'" id="prev-img-'+i+'" style="width:'+(img.size||100)+'%;max-width:100%;display:inline-block;" /></div><div class="img-size-row"><span class="img-size-label" id="size-lbl-'+i+'">'+(img.size||100)+'%</span><input type="range" class="img-size-slider" min="20" max="100" value="'+(img.size||100)+'" oninput="updateImgSize('+i+',this.value)" /></div><div class="img-edit-footer"><input class="img-caption-input" placeholder="Descriere (opțional)…" value="'+escHtml(img.caption||'')+'" /><button class="img-del-btn" onclick="removeImage('+i+')">🗑</button></div></div>';}).join('');
+}
+function updateImgSize(i,v){editImages[i].size=parseInt(v);var img=document.getElementById('prev-img-'+i);var lbl=document.getElementById('size-lbl-'+i);if(img)img.style.width=v+'%';if(lbl)lbl.textContent=v+'%';}
+function removeImage(i){document.querySelectorAll('.img-caption-input').forEach(function(inp,j){if(editImages[j])editImages[j].caption=inp.value;});document.querySelectorAll('.img-size-slider').forEach(function(sl,j){if(editImages[j])editImages[j].size=parseInt(sl.value);});editImages.splice(i,1);renderImgPreview();}
+
+// ── LINK BUILDER ──
+function populateLbProjects(){
+  var psel=document.getElementById('lb-proj');var prev=psel.value;psel.innerHTML='';
+  getProjectsOrdered().forEach(function(pname){var o=document.createElement('option');o.value=pname;o.textContent=pname+(pname===activeProject?' (curent)':'');if(pname===activeProject)o.selected=true;psel.appendChild(o);});
+  if(prev&&Array.from(psel.options).find(function(o){return o.value===prev;}))psel.value=prev;
+  populateLbSelect();
+}
+function populateLbSelect(){
+  var projName=document.getElementById('lb-proj')?document.getElementById('lb-proj').value:activeProject;if(!projName)projName=activeProject;
+  var proj=allProjects[projName]||{};var sel=document.getElementById('lb-target');sel.innerHTML='<option value="">→ pagina…</option>';
+  function walkTree(nodes){nodes.forEach(function(n){if(proj[n.title]){var o=document.createElement('option');o.value=n.title;o.textContent=n.title;sel.appendChild(o);}if(n.children&&n.children.length)walkTree(n.children);});}
+  if(proj.__tree__)walkTree(proj.__tree__);
+  else Object.keys(proj).filter(function(k){return k!=='__order__'&&k!=='__tree__';}).forEach(function(t){var o=document.createElement('option');o.value=t;o.textContent=t;sel.appendChild(o);});
+}
+function insertLink(){
+  var txt=document.getElementById('lb-text').value.trim();var projName=document.getElementById('lb-proj')?document.getElementById('lb-proj').value:activeProject;
+  var tgt=document.getElementById('lb-target').value;var anchor=document.getElementById('lb-anchor').value.trim();
+  if(!txt||!tgt){toast('Completează textul și pagina destinație.');return;}
+  var ta=document.getElementById('text-input');var dest=(projName&&projName!==activeProject)?projName+'::'+tgt:tgt;
+  if(anchor)dest+='#'+anchor;var lnk='[['+txt+'|'+dest+']]';var pos=ta.selectionStart;
+  ta.value=ta.value.slice(0,pos)+lnk+ta.value.slice(ta.selectionEnd);ta.selectionStart=ta.selectionEnd=pos+lnk.length;ta.focus();
+  document.getElementById('lb-text').value='';document.getElementById('lb-anchor').value='';toast('Link inserat ✓');
+}
+function insertLinkNewPage(){
+  var txt=document.getElementById('lb-text').value.trim();if(!txt){toast('Scrie textul clicabil mai întâi.');return;}
+  if(!pages[txt]){pages[txt]={content:'',images:[],updated:Date.now()};setPages(pages);var tree=getTree();if(!findNode(txt,tree)){tree.push({title:txt,children:[]});saveTree(tree);}}
+  populateLbSelect();document.getElementById('lb-target').value=txt;insertLink();
+}
+
+// ── CONFIRM ──
+var confirmCallback=null;
+function showConfirm(icon,title,message,yesLabel,cb){document.getElementById('confirm-icon').textContent=icon;document.getElementById('confirm-title').textContent=title;document.getElementById('confirm-message').textContent=message;document.getElementById('confirm-yes-btn').textContent=yesLabel||'✓ Confirmă';confirmCallback=cb;document.getElementById('confirm-overlay').classList.add('open');}
+function confirmYes(){document.getElementById('confirm-overlay').classList.remove('open');if(confirmCallback){confirmCallback();confirmCallback=null;}}
+function confirmNo(){document.getElementById('confirm-overlay').classList.remove('open');confirmCallback=null;}
+
+// ── LONG PRESS ──
+var lpTimer=null,lpDelay=600;
+function lpStart(e,cb){e.stopPropagation();var btn=e.currentTarget;btn.classList.add('pressing');lpTimer=setTimeout(function(){btn.classList.remove('pressing');navigator.vibrate&&navigator.vibrate(40);cb();},lpDelay);}
+function lpEnd(e){if(lpTimer){clearTimeout(lpTimer);lpTimer=null;}if(e&&e.currentTarget)e.currentTarget.classList.remove('pressing');}
+
+// ── RENDER PROJECTS LIST ──
+var expandedProjects={};
+var expandedNodes={};
+var dragProjSrc=null;
+
+function toggleProject(name,btn){
+  expandedProjects[name]=!expandedProjects[name];
+  var childDiv=document.querySelector('[data-proj-children-for="'+name.replace(/"/g,'&quot;')+'"]');
+  if(childDiv)childDiv.classList.toggle('expanded',expandedProjects[name]);
+  if(btn)btn.classList.toggle('open',expandedProjects[name]);
+}
+
+function toggleProjPageNode(projName,t,btn){
+  var key='__pn__'+projName+'__'+t;expandedNodes[key]=!expandedNodes[key];
+  var childDiv=document.querySelector('[data-pn-children="'+escHtml(projName)+'__'+escHtml(t)+'"]');
+  if(childDiv)childDiv.classList.toggle('expanded',expandedNodes[key]);
+  if(btn)btn.classList.toggle('open',expandedNodes[key]);
+}
+
+function renderProjectsList(){
+  var list=document.getElementById('projects-list');
+  var order=getProjectsOrdered();
+
+  list.innerHTML=order.map(function(name){
+    var proj=allProjects[name]||{};
+    var count=Object.keys(proj).filter(function(k){return k!=='__order__'&&k!=='__tree__';}).length;
+    var isActive=(name===activeProject);
+    var isExp=!!expandedProjects[name];
+    var tree=proj.__tree__||[];
+    var hasPages=count>0;
+
+    var row='<div class="page-item'+(isActive?' active-project':'')+'" style="margin-bottom:'+(isExp?'0':'6')+'px;border-radius:'+(isExp?'8px 8px 0 0':'8px')+';"'+
+      (!editLocked?' ondragover="dragProjOver(event)" ondrop="dragProjDrop(event,\''+escJs(name)+'\')" ondragend="dragEndFn()"':'')+'>'+
+      '<button class="tree-toggle'+(hasPages?(isExp?' open':''):' leaf')+'" onclick="toggleProject(\''+escJs(name)+'\',this);event.stopPropagation()">▶</button>'+
+      (!editLocked?'<span class="drag-handle" draggable="true" ondragstart="dragProjStart(event,\''+escJs(name)+'\')" onclick="event.stopPropagation()">⠿</span>':'')+
+      '<div class="page-item-title" onclick="switchProject(\''+escJs(name)+'\')" style="cursor:pointer;flex:1;">'+escHtml(name)+(isActive?' ✓':'')+'</div>'+
+      '<div class="page-item-meta">'+count+' pag.</div>'+
+      (!editLocked?
+        '<button class="page-item-del lp-btn" style="color:var(--accent2);font-size:15px;"'+
+        ' ontouchstart="lpStart(event,function(){renameProject(null,\''+escJs(name)+'\');})" ontouchend="lpEnd(event)" ontouchcancel="lpEnd(event)"'+
+        ' onmousedown="lpStart(event,function(){renameProject(null,\''+escJs(name)+'\');})" onmouseup="lpEnd(event)" onmouseleave="lpEnd(event)"'+
+        ' onclick="event.stopPropagation()">✏️</button>':'')+
+      (!editLocked&&!isActive?
+        '<button class="page-item-del lp-btn"'+
+        ' ontouchstart="lpStart(event,function(){deleteProjectConfirm(\''+escJs(name)+'\');})" ontouchend="lpEnd(event)" ontouchcancel="lpEnd(event)"'+
+        ' onmousedown="lpStart(event,function(){deleteProjectConfirm(\''+escJs(name)+'\');})" onmouseup="lpEnd(event)" onmouseleave="lpEnd(event)"'+
+        ' onclick="event.stopPropagation()">🗑</button>':'')+
+      (!editLocked?'<button class="page-item-del" style="color:#8ab49a;font-size:13px;" onclick="event.stopPropagation();moveProjectToProject(\''+escJs(name)+'\')">↪</button>':'')+
+      (!editLocked?'<button class="page-item-del" style="color:var(--accent2);font-size:16px;font-weight:600;" onclick="event.stopPropagation();addPageToProject(\''+escJs(name)+'\')">+</button>':'')+
+      '</div>';
+
+    // paginile proiectului
+    if(hasPages){
+      row+='<div class="tree-children'+(isExp?' expanded':'')+'" data-proj-children-for="'+escHtml(name)+'" style="border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;margin-bottom:6px;padding:4px 0;">';
+      function renderProjTree(nodes,projPagesObj,depth){
+        var out='';
+        nodes.forEach(function(node){
+          var t=node.title;if(!projPagesObj[t])return;
+          var hasKids=node.children&&node.children.length>0;
+          var nodeKey='__pn__'+name+'__'+t;var isNodeExp=!!expandedNodes[nodeKey];
+          var indent=10+depth*16;
+          var isCur=(name===activeProject&&t===current);
+          // sageti reordonare
+          var found=findNodeInProj(t,nodes,null,projPagesObj);
+          var isFirst=found&&found.idx===0;var isLast=found&&found.idx===found.siblings.length-1;
+
+          out+='<div class="page-item'+(isCur?' current-page':'')+'" style="padding-left:'+indent+'px;background:var(--bg);border:none;border-bottom:1px solid var(--border);border-radius:0;margin:0;">'+
+            '<button class="tree-toggle'+(hasKids?(isNodeExp?' open':''):' leaf')+'" onclick="toggleProjPageNode(\''+escJs(name)+'\',\''+escJs(t)+'\',this);event.stopPropagation()">▶</button>'+
+            '<div class="page-item-title" style="font-size:13px;" onclick="navigateFromProject(\''+escJs(name)+'\',\''+escJs(t)+'\');event.stopPropagation()">'+escHtml(t)+'</div>'+
+            (!editLocked&&depth<=1?'<button class="page-item-del" style="font-size:13px;opacity:'+(isFirst?'.2':'1')+'" onclick="moveProjPageUp(event,\''+escJs(name)+'\',\''+escJs(t)+'\')" '+(isFirst?'disabled':'')+'>↑</button>':'')+
+            (!editLocked&&depth<=1?'<button class="page-item-del" style="font-size:13px;opacity:'+(isLast?'.2':'1')+'" onclick="moveProjPageDown(event,\''+escJs(name)+'\',\''+escJs(t)+'\')" '+(isLast?'disabled':'')+'>↓</button>':'')+
+            (!editLocked?'<button class="page-item-del lp-btn" style="color:var(--accent2);font-size:12px;" ontouchstart="lpStart(event,function(){renameProjPage(\''+escJs(name)+'\',\''+escJs(t)+'\');})" ontouchend="lpEnd(event)" ontouchcancel="lpEnd(event)" onmousedown="lpStart(event,function(){renameProjPage(\''+escJs(name)+'\',\''+escJs(t)+'\');})" onmouseup="lpEnd(event)" onmouseleave="lpEnd(event)" onclick="event.stopPropagation()">✏️</button>':'')+
+            (!editLocked?'<button class="page-item-del" style="color:var(--accent2);font-size:13px;" onclick="addSubPageInProj(event,\''+escJs(name)+'\',\''+escJs(t)+'\')">+</button>':'')+
+            (!editLocked?'<button class="page-item-del lp-btn" ontouchstart="lpStart(event,function(){deleteProjPage(\''+escJs(name)+'\',\''+escJs(t)+'\');})" ontouchend="lpEnd(event)" ontouchcancel="lpEnd(event)" onmousedown="lpStart(event,function(){deleteProjPage(\''+escJs(name)+'\',\''+escJs(t)+'\');})" onmouseup="lpEnd(event)" onmouseleave="lpEnd(event)" onclick="event.stopPropagation()">🗑</button>':'')+
+            '</div>';
+
+          if(hasKids){
+            out+='<div class="tree-children'+(isNodeExp?' expanded':'')+'" data-pn-children="'+escHtml(name)+'__'+escHtml(t)+'">';
+            out+=renderProjTree(node.children,projPagesObj,depth+1);
+            out+='</div>';
+          }
+        });
+        return out;
+      }
+      row+=renderProjTree(tree,proj,0);
+      row+='</div>';
+    }
+    return row;
+  }).join('');
+}
+
+// helper findNode in proiect specific
+function findNodeInProj(title,nodes,parent,projPages){
+  for(var i=0;i<nodes.length;i++){
+    if(nodes[i].title===title)return{node:nodes[i],parent:parent,siblings:nodes,idx:i};
+    if(nodes[i].children&&nodes[i].children.length){var found=findNodeInProj(title,nodes[i].children,nodes[i],projPages);if(found)return found;}
+  }
+  return null;
+}
+
+function navigateFromProject(projName,title){
+  if(editing){toast('Salvează sau anulează mai întâi.');return;}
+  if(projName!==activeProject){activeProject=projName;saveActiveProject(projName);pages=getPages();current=null;}
+  navigate(title);
+}
+
+// ── OPERATII PAGINI DIN LISTA PROIECTE ──
+function renameProjPage(projName,oldTitle){
+  // comuta la proiect daca e altul
+  var savedProj=activeProject;var savedPages=pages;
+  if(projName!==activeProject){activeProject=projName;pages=getPages();}
+  if(editLocked){toast('🔒 Mod citire activ.');activeProject=savedProj;pages=savedPages;return;}
+  showConfirm('✏️','REDENUMIRE PAGINĂ','Redenumești "'+oldTitle+'"?','✏️ Redenumește',function(){
+    var newTitle=prompt('Nume nou:',oldTitle);if(!newTitle)return;newTitle=newTitle.trim();
+    if(!newTitle||newTitle===oldTitle)return;
+    if(pages[newTitle]){toast('Există deja o pagină cu acest titlu.');return;}
+    pages[newTitle]=pages[oldTitle];pages[newTitle].updated=Date.now();delete pages[oldTitle];
+    var tree=allProjects[projName].__tree__||[];var node=findNodeInProj(oldTitle,tree,null,pages);
+    if(node)node.node.title=newTitle;
+    allProjects[projName].__tree__=tree;setPages(pages);
+    if(current===oldTitle)current=newTitle;
+    activeProject=savedProj;pages=savedPages;
+    renderProjectsList();toast('Redenumit: '+newTitle);
+  });
+}
+
+function deleteProjPage(projName,title){
+  var savedProj=activeProject;var savedPages=pages;
+  if(projName!==activeProject){activeProject=projName;pages=getPages();}
+  if(editLocked){toast('🔒 Mod citire activ.');activeProject=savedProj;pages=savedPages;return;}
+  var tree=allProjects[projName].__tree__||[];
+  var node=findNodeInProj(title,tree,null,pages);
+  var hasKids=node&&node.node.children&&node.node.children.length>0;
+  showConfirm('🗑','ȘTERGERE PAGINĂ','Ștergi "'+title+'"'+(hasKids?' și subpaginile':'')+' definitiv?','🗑 Șterge',function(){
+    function delNode(n){delete pages[n.title];if(n.children)n.children.forEach(delNode);}
+    if(node){delNode(node.node);node.siblings.splice(node.idx,1);}else delete pages[title];
+    allProjects[projName].__tree__=tree;setPages(pages);
+    if(current===title){current=null;document.getElementById('view-mode').innerHTML='<div class="empty-state"><span class="big">📖</span>Pagina a fost ștearsă.</div>';}
+    activeProject=savedProj;pages=savedPages;
+    renderProjectsList();toast('Pagină ștearsă.');
+  });
+}
+
+function addSubPageInProj(e,projName,parentTitle){
+  e.stopPropagation();
+  if(editLocked){toast('🔒 Mod citire activ.');return;}
+  var title=prompt('Titlu subpagină sub "'+parentTitle+'":');
+  if(!title)return;title=title.trim();if(!title)return;
+  var savedProj=activeProject;var savedPages=pages;
+  if(projName!==activeProject){activeProject=projName;pages=getPages();}
+  if(pages[title]){toast('Există deja o pagină cu acest titlu.');activeProject=savedProj;pages=savedPages;return;}
+  pages[title]={content:'',images:[],updated:Date.now()};setPages(pages);
+  var tree=allProjects[projName].__tree__||[];
+  var par=findNodeInProj(parentTitle,tree,null,pages);
+  if(par){if(!par.node.children)par.node.children=[];par.node.children.push({title:title,children:[]});allProjects[projName].__tree__=tree;saveTree(tree);}
+  activeProject=savedProj;pages=savedPages;
+  renderProjectsList();
+  navigateFromProject(projName,title);
+  setTimeout(toggleEdit,150);
+}
+
+function moveProjPageUp(e,projName,title){
+  e.stopPropagation();if(editLocked)return;
+  var tree=allProjects[projName].__tree__||[];
+  var found=findNodeInProj(title,tree,null,allProjects[projName]);
+  if(!found)return;var siblings=found.siblings;var idx=found.idx;if(idx===0)return;
+  var tmp=siblings[idx-1];siblings[idx-1]=siblings[idx];siblings[idx]=tmp;
+  allProjects[projName].__tree__=tree;saveProjects(allProjects);renderProjectsList();
+}
+function moveProjPageDown(e,projName,title){
+  e.stopPropagation();if(editLocked)return;
+  var tree=allProjects[projName].__tree__||[];
+  var found=findNodeInProj(title,tree,null,allProjects[projName]);
+  if(!found)return;var siblings=found.siblings;var idx=found.idx;if(idx===siblings.length-1)return;
+  var tmp=siblings[idx+1];siblings[idx+1]=siblings[idx];siblings[idx]=tmp;
+  allProjects[projName].__tree__=tree;saveProjects(allProjects);renderProjectsList();
+}
+
+// ── PROJECTS CRUD ──
+function renameProject(e,oldName){
+  if(e)e.stopPropagation();if(editLocked){toast('🔒 Mod citire activ.');return;}
+  showConfirm('✏️','REDENUMIRE PROIECT','Redenumești "'+oldName+'"?','✏️ Redenumește',function(){
+    var newName=prompt('Nume nou:',oldName);if(!newName)return;newName=newName.trim();
+    if(!newName||newName===oldName)return;if(allProjects[newName]){toast('Există deja.');return;}
+    allProjects[newName]=allProjects[oldName];delete allProjects[oldName];
+    if(activeProject===oldName){activeProject=newName;saveActiveProject(newName);}
+    saveProjects(allProjects);renderProjectsList();toast('Redenumit: '+newName);
+  });
+}
+function deleteProjectConfirm(name){
+  if(editLocked){toast('🔒 Mod citire activ.');return;}
+  showConfirm('🗑','ȘTERGERE PROIECT','Ștergi definitiv "'+name+'" și TOATE paginile? Nu poate fi anulat!','🗑 Șterge definitiv',function(){
+    var keys=Object.keys(allProjects);if(keys.length<=1){toast('Nu poți șterge singurul proiect.');return;}
+    delete allProjects[name];saveProjects(allProjects);
+    var order=getProjectsOrdered().filter(function(k){return k!==name;});saveProjectsOrder(order);
+    if(activeProject===name){activeProject=Object.keys(allProjects)[0];saveActiveProject(activeProject);pages=getPages();current=null;}
+    renderProjectsList();toast('Proiect șters.');
+  });
+}
+function switchProject(name){
+  if(editing){toast('Salvează sau anulează mai întâi.');return;}
+  // tap pe titlu proiect -> du direct la ultima lectura memorata
+  activeProject=name;saveActiveProject(name);pages=getPages();
+  document.getElementById('nav-crumb-proj').textContent=name;
+  var last=loadLastPage();var order2=getPageOrder();
+  if(last&&pages[last]){navigate(last);}
+  else if(order2.length){navigate(order2[0]);}
+  else{toast('Proiect fără pagini.');}
+}
+function createProject(){
+  if(editLocked){toast('🔒 Mod citire activ.');return;}
+  var inp=document.getElementById('new-project-input');var name=inp.value.trim();
+  if(!name){toast('Scrie un nume.');return;}if(allProjects[name]){toast('Proiectul există deja.');return;}
+  allProjects[name]={};saveProjects(allProjects);inp.value='';
+  activeProject=name;saveActiveProject(name);pages=getPages();
+  expandedProjects[name]=true;
+  renderProjectsList();toast('Proiect creat: '+name);
+}
+
+function addPageToProject(projName){
+  if(editLocked){toast('🔒 Mod citire activ.');return;}
+  var title=prompt('Titlu pagină nouă în "'+projName+'":');
+  if(!title)return;title=title.trim();if(!title)return;
+  var proj=allProjects[projName]||{};
+  if(proj[title]){toast('Există deja o pagină cu acest titlu.');return;}
+  proj[title]={content:'',images:[],updated:Date.now()};
+  var tree=proj.__tree__||[];
+  tree.push({title:title,children:[]});
+  proj.__tree__=tree;
+  allProjects[projName]=proj;
+  saveProjects(allProjects);
+  expandedProjects[projName]=true;
+  renderProjectsList();
+  navigateFromProject(projName,title);
+  setTimeout(toggleEdit,150);
+}
+
+function moveProjectToProject(srcName){
+  var others=Object.keys(allProjects).filter(function(k){return k!==srcName;});
+  if(!others.length){toast('Nu există alt proiect destinație.');return;}
+  var opts=others.map(function(n,i){return(i+1)+'. '+n;}).join('\n');
+  var choice=prompt('Mută "'+srcName+'" ca pagină în:\n\n'+opts+'\n\nScrie numărul sau numele:');
+  if(!choice)return;choice=choice.trim();
+  var destName=null;var num=parseInt(choice);
+  if(!isNaN(num)&&num>=1&&num<=others.length)destName=others[num-1];
+  else if(allProjects[choice]&&choice!==srcName)destName=choice;
+  if(!destName){toast('Proiect invalid.');return;}
+  showConfirm('↪','MUTĂ PROIECT','Proiectul "'+srcName+'" va deveni pagină în "'+destName+'". Continuăm?','↪ Mută',function(){
+    var srcProj=allProjects[srcName]||{};var destProj=allProjects[destName]||{};
+    var destTree=destProj.__tree__||[];var srcTree=srcProj.__tree__||[];
+    if(!destProj[srcName])destProj[srcName]={content:'',images:[],updated:Date.now()};
+    Object.keys(srcProj).forEach(function(k){if(k==='__tree__'||k==='__order__')return;destProj[k]=srcProj[k];});
+    destTree.push({title:srcName,children:srcTree});destProj.__tree__=destTree;allProjects[destName]=destProj;
+    delete allProjects[srcName];var order=getProjectsOrdered().filter(function(k){return k!==srcName;});saveProjectsOrder(order);
+    if(activeProject===srcName){activeProject=destName;saveActiveProject(destName);pages=getPages();}
+    saveProjects(allProjects);renderProjectsList();toast('"'+srcName+'" mutat în "'+destName+'" ✓');
+  });
+}
+
+// ── DRAG PROIECTE ──
+function dragProjStart(e,name){dragProjSrc=name;e.dataTransfer.effectAllowed='move';}
+function dragEndFn(){}
+function dragProjOver(e){
+  e.preventDefault();e.stopPropagation();e.dataTransfer.dropEffect='move';
+  document.querySelectorAll('.drop-before,.drop-after').forEach(function(el){el.classList.remove('drop-before','drop-after');});
+  var el=e.currentTarget;var rect=el.getBoundingClientRect();var mid=rect.top+rect.height/2;
+  el.classList.add(e.clientY<mid?'drop-before':'drop-after');
+}
+function dragProjDrop(e,target){
+  e.preventDefault();var insertBefore=e.currentTarget.classList.contains('drop-before');dragEndFn();
+  if(!dragProjSrc||dragProjSrc===target)return;
+  var order=getProjectsOrdered();var si=order.indexOf(dragProjSrc);var ti=order.indexOf(target);
+  if(si===-1||ti===-1)return;order.splice(si,1);ti=order.indexOf(target);
+  order.splice(insertBefore?ti:ti+1,0,dragProjSrc);saveProjectsOrder(order);dragProjSrc=null;renderProjectsList();
+}
+
+// ── SEARCH ──
+var lastSearchResults='',lastSearchQuery='';
+function buildSearchIndexForProject(projName){
+  var proj=allProjects[projName]||{};var order=[];
+  function walkForSearch(nodes){nodes.forEach(function(n){if(proj[n.title]&&order.indexOf(n.title)===-1)order.push(n.title);if(n.children&&n.children.length)walkForSearch(n.children);});}
+  if(proj.__tree__)walkForSearch(proj.__tree__);
+  Object.keys(proj).forEach(function(k){if(k!=='__order__'&&k!=='__tree__'&&order.indexOf(k)===-1)order.push(k);});
+  var index={};
+  order.forEach(function(title){if(!proj[title])return;var content=proj[title].content||'';index[title]={tl:norm(title),cl:norm(content),title:title,content:content};});
+  return{order:order,index:index};
+}
+function openSearch(){
+  if(lastSearchResults){document.getElementById('search-input-field').value=lastSearchQuery;document.getElementById('search-results').innerHTML=lastSearchResults;}
+  else{document.getElementById('search-input-field').value='';document.getElementById('search-results').innerHTML='<div class="empty-state">Scrie un cuvânt și apasă <strong>Caută</strong>.</div>';}
+  document.getElementById('search-overlay').classList.add('open');
+  setTimeout(function(){document.getElementById('search-input-field').focus();},100);
+}
+function closeSearch(){document.getElementById('search-overlay').classList.remove('open');}
+function doSearchNow(){var q=document.getElementById('search-input-field').value.trim();if(!q)return;doSearch(q);}
+function doSearch(q){
+  var el=document.getElementById('search-results');el.innerHTML='<div class="empty-state">Se caută…</div>';
+  setTimeout(function(){
+    var ql=norm(q);var parts=[];
+    var searchOrder=[activeProject].concat(getProjectsOrdered().filter(function(k){return k!==activeProject;}));
+    searchOrder.forEach(function(projName){
+      var built=buildSearchIndexForProject(projName);var order=built.order;var index=built.index;
+      order.forEach(function(key){
+        var ix=index[key];if(!ix)return;
+        var inTitle=ix.tl.indexOf(ql)!==-1;var hits=[];var p=0;
+        while((p=ix.cl.indexOf(ql,p))!==-1){hits.push(p);p+=ql.length;}
+        if(!inTitle&&!hits.length)return;
+        var title=ix.title;var content=ix.content;
+        var snips=hits.map(function(p){var s=Math.max(0,p-50);var e=Math.min(content.length,p+ql.length+50);var raw=(s>0?'…':'')+content.slice(s,e)+(e<content.length?'…':'');var rn=norm(raw);var out='';var off=0;var rp=0;while((rp=rn.indexOf(ql,off))!==-1){out+=escHtml(raw.slice(off,rp))+'<mark>'+escHtml(raw.slice(rp,rp+ql.length))+'</mark>';off=rp+ql.length;}return out+escHtml(raw.slice(off));});
+        var th='';var off=0;var tp=0;while((tp=ix.tl.indexOf(ql,off))!==-1){th+=escHtml(title.slice(off,tp))+'<mark style="background:var(--accent);color:var(--bg);border-radius:3px;padding:0 2px;">'+escHtml(title.slice(tp,tp+ql.length))+'</mark>';off=tp+ql.length;}th+=escHtml(title.slice(off));
+        var cnt=hits.length?'<span class="sr-count">('+hits.length+' apariț'+(hits.length===1?'ie':'ii')+')</span>':'';
+        var projLabel=(projName!==activeProject)?'<span style="font-family:monospace;font-size:10px;background:var(--accent2);color:var(--bg);border-radius:3px;padding:1px 5px;margin-left:6px;">'+escHtml(projName)+'</span>':'';
+        var shtml=snips.map(function(s,i){return'<div class="sr-snippet" onclick="switchAndNavigate(\''+escJs(projName)+'\',\''+escJs(title)+'\',\''+escJs(q)+'\','+i+')">'+s+'</div>';}).join('');
+        parts.push({html:'<div class="sr-item"><div class="sr-title" onclick="switchAndNavigate(\''+escJs(projName)+'\',\''+escJs(title)+'\',\''+escJs(q)+'\',0)">'+th+cnt+projLabel+'</div>'+shtml+'</div>'});
+      });
+    });
+    if(!parts.length){var html='<div class="empty-state">Niciun rezultat pentru <strong>"'+escHtml(q)+'"</strong>.</div>';el.innerHTML=html;lastSearchResults=html;lastSearchQuery=q;return;}
+    var html=parts.map(function(p){return p.html;}).join('');el.innerHTML=html;lastSearchResults=html;lastSearchQuery=q;
+  },30);
+}
+function switchAndNavigate(projName,title,query,idx){
+  if(projName!==activeProject){activeProject=projName;saveActiveProject(projName);pages=getPages();current=null;}
+  closeSearch();if(query){navigateToMatch(title,query,idx);}else{navigate(title);}
+}
+
+// ── EXPORT / IMPORT ──
+function exportWiki(){
+  var data=JSON.stringify({version:2,activeProject:activeProject,projectsOrder:getProjectsOrdered(),allProjects:allProjects},null,2);
+  var blob=new Blob([data],{type:'application/json'});var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;a.download='wiki-'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(url);
+  saveLastExportTime();dismissBackupReminder();toast('✓ Exportat!');
+}
+function importWiki(event){
+  var file=event.target.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var data=JSON.parse(e.target.result);
+      if(data.version===2&&data.allProjects){
+        var projCount=Object.keys(data.allProjects).length;
+        if(!confirm('Importă '+projCount+' proiecte? Proiectele existente cu același nume vor fi suprascrise.'))return;
+        Object.assign(allProjects,data.allProjects);saveProjects(allProjects);
+        if(data.projectsOrder)saveProjectsOrder(data.projectsOrder);
+        pages=getPages();renderProjectsList();toast('✓ '+projCount+' proiecte importate!');
+      }else{
+        var imported=data.pages||data;if(typeof imported!=='object')throw new Error('Format invalid');
+        var count=Object.keys(imported).filter(function(k){return k!=='__order__';}).length;
+        if(!confirm('Importă '+count+' pagini în proiectul curent?'))return;
+        Object.assign(pages,imported);setPages(pages);renderProjectsList();toast('✓ '+count+' pagini importate!');
+      }
+    }catch(err){toast('❌ Fișier invalid.');}
+  };
+  reader.readAsText(file);event.target.value='';
+}
+
+// ── INIT ──
+function appInit(loadedProjects){
+  allProjects=loadedProjects||{'Proiect 1':{}};
+  activeProject=loadActiveProject();
+  if(!activeProject||!allProjects[activeProject]){activeProject=Object.keys(allProjects)[0]||'Proiect 1';saveActiveProject(activeProject);}
+  pages=getPages();
+
+  document.getElementById('new-project-input').addEventListener('keydown',function(e){if(e.key==='Enter')createProject();});
+  document.getElementById('search-input-field').addEventListener('keydown',function(e){if(e.key==='Escape')closeSearch();});
+
+  checkStorageWarning();requestPersistentStorage();initFontSize();
+  editLocked=loadLockState();
+
+  // Porneste pe ecranul de proiecte
+  document.getElementById('nav-crumb-proj').textContent=activeProject||'';
+  document.getElementById('font-controls').style.display='none';
+  renderProjectsList();
+  applyLockState();
+  checkBackupReminder();
+}
+
+openDB().then(function(){return loadProjectsFromIDB();}).then(function(idbData){
+  if(idbData&&Object.keys(idbData).length>0){appInit(idbData);}
+  else{
+    var lsData=null;
+    try{var lsRaw=localStorage.getItem('wiki_projects_v1');if(lsRaw)lsData=JSON.parse(lsRaw);}catch(e){}
+    if(!lsData){try{var op=localStorage.getItem('wiki_pages_v1');if(op)lsData={'Proiect 1':JSON.parse(op)};}catch(e){}}
+    if(lsData){idbSet('allProjects',JSON.stringify(lsData)).then(function(){toast('✓ Date migrate în IndexedDB');appInit(lsData);});}
+    else{appInit(null);}
+  }
+}).catch(function(){
+  var lsData=null;try{var r=localStorage.getItem('wiki_projects_v1');if(r)lsData=JSON.parse(r);}catch(e){}
+  appInit(lsData);
+});
+
+// ── PWA ──
+(function(){
+  var iconSvg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="ag" x1="30%" y1="0%" x2="70%" y2="100%"><stop offset="0%" stop-color="#d8d8d8"/><stop offset="40%" stop-color="#a8a8a8"/><stop offset="100%" stop-color="#686868"/></linearGradient></defs><path d="M263 80 Q263 48 293 38 Q278 62 278 80Z" fill="#888"/><path d="M268 85 Q295 55 325 68 Q305 72 290 95 Q278 112 263 105 Q255 98 268 85Z" fill="#6aaa45"/><path d="M195 150 Q165 138 148 160 Q118 188 112 235 Q104 295 128 348 Q148 392 178 410 Q200 422 222 408 Q240 398 263 398 Q286 398 304 408 Q326 422 348 410 Q378 392 398 348 Q422 295 414 235 Q408 188 378 160 Q361 138 331 150 Q310 162 263 162 Q216 162 195 150Z" fill="url(#ag)"/><path d="M331 150 Q361 138 378 160 Q395 180 388 210 Q368 195 345 188 Q318 180 310 162 Q320 155 331 150Z" fill="white" opacity="0.01"/><ellipse cx="210" cy="230" rx="32" ry="55" fill="white" opacity="0.18" transform="rotate(-15 210 230)"/></svg>';
+  var iconUrl='data:image/svg+xml,'+encodeURIComponent(iconSvg);
+  var startUrl=location.origin+location.pathname;
+  var manifest={name:'Wiki Personal',short_name:'Wiki',description:'Wiki personal offline',start_url:startUrl,scope:location.origin+location.pathname,display:'standalone',background_color:'#c8bfae',theme_color:'#6a4c2a',orientation:'portrait-primary',icons:[{src:iconUrl,sizes:'512x512',type:'image/svg+xml',purpose:'any maskable'}]};
+  var manifestBlob=new Blob([JSON.stringify(manifest)],{type:'application/manifest+json'});
+  var linkEl=document.createElement('link');linkEl.rel='manifest';linkEl.href=URL.createObjectURL(manifestBlob);document.head.appendChild(linkEl);
+  var appleIcon=document.createElement('link');appleIcon.rel='apple-touch-icon';appleIcon.href=iconUrl;document.head.appendChild(appleIcon);
+  if(!('serviceWorker' in navigator))return;
+  var swUrl=new URL('sw.js',location.href).href;
+  navigator.serviceWorker.register(swUrl,{scope:location.pathname.replace(/[^/]*$/,'')||'/'})
+    .then(function(reg){reg.update();navigator.serviceWorker.ready.then(function(){caches.open('wiki-v20260406').then(function(c){c.add(startUrl).catch(function(){});});});})
+    .catch(function(){});
+})();
+</script>
+</body>
+</html>
