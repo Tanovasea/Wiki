@@ -642,6 +642,7 @@
         <span id="tab-active-proj" style="display:none"></span>
         <span id="tab-active-text"></span>
       </div>
+      <button id="tab-active-pin" class="dd-tab-pin" onclick="toggleActiveTabPin()" title="Fixează">📌</button>
       <button id="tab-active-close" onclick="closeActiveTab()" title="Închide">✕</button>
     </div>
   </div>
@@ -1425,11 +1426,43 @@ function appInit() {
   applyLockState();
   checkBackupReminder();
 
-  var initLast  = loadLastPage();
-  var initOrder = getPageOrder();
-  if (initLast && pages[initLast]) navigate(initLast);
-  else if (initOrder.length) navigate(initOrder[0]);
-  else { updateBreadcrumb(); updatePageBreadcrumb(null); }
+  // ── Restaurare tab-uri salvate ──
+  var restoredTabs = false;
+  if (openTabs.length > 0) {
+    // Filtrăm tab-urile care aparțin proiectului activ și paginile există
+    var validTabs = openTabs.filter(function(t) {
+      return t.proj && allProjects[t.proj] && allProjects[t.proj][t.page];
+    });
+    if (validTabs.length > 0) {
+      openTabs = validTabs;
+      // Verificăm dacă activeTabId e valid
+      var activeExists = openTabs.find(function(t){ return t.id === activeTabId; });
+      if (!activeExists) activeTabId = openTabs[openTabs.length - 1].id;
+      // Navighează la tab-ul activ
+      var activeTab = openTabs.find(function(t){ return t.id === activeTabId; });
+      if (activeTab) {
+        if (activeTab.proj !== activeProject) {
+          // Tab-ul activ e din alt proiect — schimbăm proiectul silențios
+          activeProject = activeTab.proj;
+          saveActiveProject(activeProject);
+          pages = getPages();
+        }
+        renderTabs();
+        navigate(activeTab.page);
+        restoredTabs = true;
+      }
+    } else {
+      openTabs = [];
+      activeTabId = null;
+    }
+  }
+  if (!restoredTabs) {
+    var initLast  = loadLastPage();
+    var initOrder = getPageOrder();
+    if (initLast && pages[initLast]) navigate(initLast);
+    else if (initOrder.length) navigate(initOrder[0]);
+    else { updateBreadcrumb(); updatePageBreadcrumb(null); }
+  }
 }
 
 // ── PORNIRE APLICATIE ──
@@ -3865,8 +3898,17 @@ function restoreTabScroll(id) {
 
 // ── TABS SYSTEM ──
 // Tab structure: { proj: string, page: string, id: string }
-var openTabs = [];
-var activeTabId = null;
+var openTabs = (function(){
+  try { var s=localStorage.getItem('wiki_tabs'); return s?JSON.parse(s):[]; } catch(e){return[];}
+})();
+var activeTabId = localStorage.getItem('wiki_active_tab') || null;
+
+function saveTabsState() {
+  try {
+    localStorage.setItem('wiki_tabs', JSON.stringify(openTabs));
+    localStorage.setItem('wiki_active_tab', activeTabId || '');
+  } catch(e) {}
+}
 
 function tabId(proj, page) {
   return proj + '::' + page;
@@ -3963,6 +4005,7 @@ function tabNavigateTo(proj, page) {
 function scrollTabIntoView(id) { /* nu mai e nevoie */ }
 
 function renderTabs() {
+  saveTabsState();
   var placeholder = document.getElementById('tabs-placeholder');
   var tabActive   = document.getElementById('tab-active');
   var countBtn    = document.getElementById('tab-count-btn');
@@ -3990,6 +4033,13 @@ function renderTabs() {
     countBtn.textContent = others + ' ▾';
   } else {
     countBtn.classList.remove('visible');
+  }
+
+  // Buton pin direct pe tab-ul activ (vizibil si când e 1 singur tab)
+  var pinBtn = document.getElementById('tab-active-pin');
+  if (pinBtn) {
+    pinBtn.classList.toggle('on', !!active.pinned);
+    pinBtn.title = active.pinned ? 'Defixează' : 'Fixează';
   }
 }
 
@@ -4067,6 +4117,15 @@ function tabClick(id) {
   activeTabId = id;
   renderTabs();
   tabNavigateTo(tab.proj, tab.page);
+}
+
+function toggleActiveTabPin() {
+  var tab = openTabs.find(function(t){ return t.id === activeTabId; });
+  if (!tab) return;
+  tab.pinned = !tab.pinned;
+  toast(tab.pinned ? '📌 Tab fixat' : 'Tab defixat');
+  renderTabs();
+  renderTabsDropdown();
 }
 
 function toggleTabPin(id) {
