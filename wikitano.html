@@ -883,6 +883,36 @@
       </div>
     </div>
 
+    <div class="settings-section-title">Icon Aplicație</div>
+
+    <div class="settings-row" style="flex-direction:column;gap:10px;align-items:stretch;">
+      <!-- Preview icon curent -->
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div id="icon-preview" style="width:56px;height:56px;border-radius:14px;overflow:hidden;border:2px solid var(--border);flex-shrink:0;background:var(--surface2);display:flex;align-items:center;justify-content:center;">
+          <!-- populat de JS -->
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);line-height:1.5;">
+          Iconul apare pe ecranul de start după reinstalare PWA
+        </div>
+      </div>
+
+      <!-- Iconuri predefinite -->
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);margin-bottom:2px;">Alege un icon predefinit:</div>
+      <div id="preset-icons" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">
+        <!-- populat de JS -->
+      </div>
+
+      <!-- Upload imagine -->
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);margin-top:4px;margin-bottom:2px;">Sau încarcă o imagine:</div>
+      <label style="display:flex;align-items:center;justify-content:center;gap:8px;background:var(--surface2);border:1px dashed var(--border);border-radius:var(--radius);padding:10px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);">
+        📁 Alege din galerie
+        <input type="file" accept="image/*" id="icon-upload-input" style="display:none;" onchange="handleIconUpload(event)">
+      </label>
+
+      <!-- Buton reset -->
+      <button onclick="resetIconToDefault()" style="background:transparent;border:1px solid var(--border);border-radius:var(--radius);color:var(--text-dim);font-family:'JetBrains Mono',monospace;font-size:11px;padding:8px;cursor:pointer;">↺ Resetează la iconul original</button>
+    </div>
+
     <div class="settings-section-title">Stocare</div>
 
     <div class="settings-row" id="storage-info-row">
@@ -2254,6 +2284,164 @@ var THEMES = {
   }
 };
 
+// ── ICON MANAGER ──
+
+var PRESET_ICONS = [
+  { label: '📖', type: 'emoji', value: '📖' },
+  { label: '📚', type: 'emoji', value: '📚' },
+  { label: '🗒️', type: 'emoji', value: '🗒️' },
+  { label: '✍️', type: 'emoji', value: '✍️' },
+  { label: '🔖', type: 'emoji', value: '🔖' },
+  { label: '🧠', type: 'emoji', value: '🧠' },
+  { label: '🌿', type: 'emoji', value: '🌿' },
+  { label: '⚡', type: 'emoji', value: '⚡' },
+  { label: '🎯', type: 'emoji', value: '🎯' },
+  { label: '🏠', type: 'emoji', value: '🏠' }
+];
+
+function buildEmojiIconUrl(emoji, bg) {
+  bg = bg || '#1a1a1a';
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">' +
+    '<rect width="512" height="512" rx="80" fill="' + bg + '"/>' +
+    '<text x="256" y="340" font-size="300" text-anchor="middle" dominant-baseline="auto">' + emoji + '</text>' +
+    '</svg>';
+  return 'data:image/svg+xml,' + encodeURIComponent(svg);
+}
+
+function getCurrentIconUrl() {
+  var saved = localStorage.getItem('wiki_custom_icon');
+  if (saved) return saved;
+  return null; // va folosi originalul
+}
+
+function saveCustomIcon(dataUrl) {
+  localStorage.setItem('wiki_custom_icon', dataUrl);
+  updatePwaManifestIcon(dataUrl);
+  renderIconPreview();
+  toast('✓ Icon salvat! Reinstalează PWA pentru a-l vedea pe ecranul de start.');
+}
+
+function updatePwaManifestIcon(iconUrl) {
+  var existing = document.querySelector('link[rel="manifest"]');
+  var appleIcon = document.querySelector('link[rel="apple-touch-icon"]');
+
+  var startUrl = location.origin + location.pathname;
+  var manifest = {
+    name: 'Wiki Personal',
+    short_name: 'Wiki',
+    description: 'Wiki personal offline',
+    start_url: startUrl,
+    scope: location.origin + location.pathname,
+    display: 'standalone',
+    background_color: '#c8bfae',
+    theme_color: '#6a4c2a',
+    orientation: 'portrait-primary',
+    icons: [{ src: iconUrl, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }]
+  };
+  var blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+  var url  = URL.createObjectURL(blob);
+
+  if (existing) {
+    if (existing._prevObjectUrl) URL.revokeObjectURL(existing._prevObjectUrl);
+    existing._prevObjectUrl = url;
+    existing.href = url;
+  }
+  if (appleIcon) appleIcon.href = iconUrl;
+}
+
+function renderIconPreview() {
+  var preview = document.getElementById('icon-preview');
+  if (!preview) return;
+  var iconUrl = getCurrentIconUrl();
+  if (iconUrl) {
+    preview.innerHTML = '<img src="' + iconUrl + '" style="width:100%;height:100%;object-fit:cover;">';
+  } else {
+    // iconul SVG original
+    var originalSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="80" fill="#1a1a1a"/><defs><linearGradient id="ag2" x1="30%" y1="0%" x2="70%" y2="100%"><stop offset="0%" stop-color="#d8d8d8"/><stop offset="40%" stop-color="#a8a8a8"/><stop offset="100%" stop-color="#686868"/></linearGradient></defs><path d="M263 80 Q263 48 293 38 Q278 62 278 80Z" fill="#888"/><path d="M263 80 Q255 55 228 48 Q248 52 263 80Z" fill="#777"/><path d="M268 85 Q295 55 325 68 Q305 72 290 95 Q278 112 263 105 Q255 98 268 85Z" fill="#6aaa45"/><path d="M195 150 Q165 138 148 160 Q118 188 112 235 Q104 295 128 348 Q148 392 178 410 Q200 422 222 408 Q240 398 263 398 Q286 398 304 408 Q326 422 348 410 Q378 392 398 348 Q422 295 414 235 Q408 188 378 160 Q361 138 331 150 Q310 162 263 162 Q216 162 195 150Z" fill="url(#ag2)"/><path d="M331 150 Q361 138 378 160 Q395 180 388 210 Q368 195 345 188 Q318 180 310 162 Q320 155 331 150Z" fill="#1a1a1a"/><ellipse cx="210" cy="230" rx="32" ry="55" fill="white" opacity="0.18" transform="rotate(-15 210 230)"/></svg>';
+    preview.innerHTML = '<img src="data:image/svg+xml,' + encodeURIComponent(originalSvg) + '" style="width:100%;height:100%;object-fit:cover;">';
+  }
+}
+
+function renderPresetIcons() {
+  var container = document.getElementById('preset-icons');
+  if (!container) return;
+  var currentIcon = getCurrentIconUrl();
+  container.innerHTML = '';
+  PRESET_ICONS.forEach(function(preset) {
+    var url = buildEmojiIconUrl(preset.value);
+    var isActive = currentIcon === url;
+    var btn = document.createElement('button');
+    btn.title = preset.label;
+    btn.style.cssText = 'background:' + (isActive ? 'var(--accent2)' : 'var(--surface2)') + ';' +
+      'border:2px solid ' + (isActive ? 'var(--accent)' : 'var(--border)') + ';' +
+      'border-radius:12px;padding:4px;cursor:pointer;font-size:26px;line-height:1;' +
+      'transition:border-color .15s,background .15s;';
+    btn.textContent = preset.value;
+    btn.onclick = function() {
+      var iconUrl = buildEmojiIconUrl(preset.value);
+      saveCustomIcon(iconUrl);
+      renderPresetIcons();
+    };
+    container.appendChild(btn);
+  });
+}
+
+function handleIconUpload(event) {
+  var file = event.target.files && event.target.files[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) {
+    toast('⚠️ Imaginea e prea mare. Max 2MB.');
+    return;
+  }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = new Image();
+    img.onload = function() {
+      // Redimensionare la 512x512
+      var canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      var ctx = canvas.getContext('2d');
+      // fundal rotunjit
+      ctx.fillStyle = '#1a1a1a';
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(0, 0, 512, 512, 80);
+      } else {
+        var r = 80, w2 = 512, h2 = 512;
+        ctx.moveTo(r, 0); ctx.lineTo(w2-r, 0); ctx.quadraticCurveTo(w2, 0, w2, r);
+        ctx.lineTo(w2, h2-r); ctx.quadraticCurveTo(w2, h2, w2-r, h2);
+        ctx.lineTo(r, h2); ctx.quadraticCurveTo(0, h2, 0, h2-r);
+        ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0); ctx.closePath();
+      }
+      ctx.fill();
+      // imaginea centrată și acoperind canvas-ul
+      var scale = Math.max(512 / img.width, 512 / img.height);
+      var w = img.width * scale;
+      var h = img.height * scale;
+      ctx.drawImage(img, (512 - w) / 2, (512 - h) / 2, w, h);
+      var dataUrl = canvas.toDataURL('image/png', 0.9);
+      saveCustomIcon(dataUrl);
+      renderPresetIcons();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  // reset input
+  event.target.value = '';
+}
+
+function resetIconToDefault() {
+  localStorage.removeItem('wiki_custom_icon');
+  // restaurează iconul original în manifest
+  var originalSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="80" fill="#1a1a1a"/><defs><linearGradient id="ag" x1="30%" y1="0%" x2="70%" y2="100%"><stop offset="0%" stop-color="#d8d8d8"/><stop offset="40%" stop-color="#a8a8a8"/><stop offset="100%" stop-color="#686868"/></linearGradient></defs><path d="M263 80 Q263 48 293 38 Q278 62 278 80Z" fill="#888"/><path d="M263 80 Q255 55 228 48 Q248 52 263 80Z" fill="#777"/><path d="M268 85 Q295 55 325 68 Q305 72 290 95 Q278 112 263 105 Q255 98 268 85Z" fill="#6aaa45"/><path d="M195 150 Q165 138 148 160 Q118 188 112 235 Q104 295 128 348 Q148 392 178 410 Q200 422 222 408 Q240 398 263 398 Q286 398 304 408 Q326 422 348 410 Q378 392 398 348 Q422 295 414 235 Q408 188 378 160 Q361 138 331 150 Q310 162 263 162 Q216 162 195 150Z" fill="url(#ag)"/><path d="M331 150 Q361 138 378 160 Q395 180 388 210 Q368 195 345 188 Q318 180 310 162 Q320 155 331 150Z" fill="#1a1a1a"/><ellipse cx="210" cy="230" rx="32" ry="55" fill="white" opacity="0.18" transform="rotate(-15 210 230)"/></svg>';
+  var iconUrl = 'data:image/svg+xml,' + encodeURIComponent(originalSvg);
+  updatePwaManifestIcon(iconUrl);
+  renderIconPreview();
+  renderPresetIcons();
+  toast('✓ Icon resetat la original.');
+}
+
 function openSettings() {
   var sl = document.getElementById('set-font-size');
   if (sl) sl.value = fontIdx;
@@ -2267,6 +2455,8 @@ function openSettings() {
   }
   document.getElementById('settings-overlay').classList.add('open');
   updateStorageInfo();
+  renderIconPreview();
+  renderPresetIcons();
 }
 
 function toggleLockFromSettings() {
@@ -4174,6 +4364,9 @@ var _origNavigate = null; // will be set after navigate is defined
   linkEl.rel  = 'manifest';
   linkEl.href = URL.createObjectURL(manifestBlob);
   document.head.appendChild(linkEl);
+
+  var savedIcon = localStorage.getItem('wiki_custom_icon');
+  var iconUrl = savedIcon || ('data:image/svg+xml,' + encodeURIComponent(iconSvg));
 
   var appleIcon = document.createElement('link');
   appleIcon.rel  = 'apple-touch-icon';
