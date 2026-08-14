@@ -1,6 +1,6 @@
-// Wiki Personal — Service Worker v20260406
+// Wiki Personal — Service Worker v20260815
 
-const CACHE = 'wiki-v20260406';
+const CACHE = 'wiki-v20260815';
 
 self.addEventListener('install', function(e) {
   e.waitUntil(
