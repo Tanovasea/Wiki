@@ -1,9 +1,13 @@
-// Wiki Personal — Service Worker v20260815l
+// Wiki Personal — Service Worker v20260815n
+//
+// Aplicatia sta in /Wiki/, deci acest service worker are teritoriul /Wiki/ si
+// nu atinge paginile din /LogOS/. DAR cache-urile sunt comune pe tot domeniul
+// tanovasea.github.io, nu pe folder — de aceea stergem doar ce e al nostru
+// (prefixul 'wiki-'). Varianta veche stergea tot, inclusiv cache-ul LogOS.
 
-const CACHE = 'wiki-v20260815l';
+const CACHE = 'wiki-v20260815n';
 
-// Pagina e salvata sub toate numele sub care poate fi deschisa aplicatia
-// (radacina, wikitano.html, index.html). Daca unul lipseste, nu conteaza.
+// Paginile servite de pe acest domeniu
 const PRECACHE = ['./', './wikitano.html', './index.html'];
 
 self.addEventListener('install', function(e) {
@@ -20,28 +24,42 @@ self.addEventListener('install', function(e) {
 self.addEventListener('activate', function(e) {
   e.waitUntil(
     caches.keys().then(function(keys) {
-      return Promise.all(keys.filter(function(k){return k!==CACHE;}).map(function(k){return caches.delete(k);}));
+      // Doar cache-urile noastre. Alte aplicatii de pe acelasi domeniu isi
+      // pastreaza ale lor — stergerea le-ar scoate din functionare offline.
+      return Promise.all(keys.filter(function(k) {
+        return k.indexOf('wiki-') === 0 && k !== CACHE;
+      }).map(function(k) { return caches.delete(k); }));
     }).then(function() { return self.clients.claim(); })
   );
 });
 
-// Cautare in cache tolerantă: ignoreVary evita ratarile cand serverul trimite
-// antetul Vary, ignoreSearch acopera adresele cu ?parametri.
+// Cautare toleranta: ignoreVary evita ratarile cand serverul trimite antetul
+// Vary, ignoreSearch acopera adresele cu ?parametri.
 function fromCache(req) {
   return caches.match(req, { ignoreVary: true }).then(function(r) {
     return r || caches.match(req, { ignoreVary: true, ignoreSearch: true });
   });
 }
 
-// Ultima plasa de siguranta pentru navigare: orice copie a aplicatiei
-function appShell() {
+// Rezerva la navigare — strict pentru adresa ceruta din folderul nostru.
+function offlineFallback(url) {
+  var path = url.pathname, candidates = [];
+  if (/wikitano\.html$/.test(path)) candidates.push('./wikitano.html');
+  else if (/\/$/.test(path) || /index\.html$/.test(path)) candidates.push('./index.html', './');
+  else candidates.push(path);
+
   return caches.open(CACHE).then(function(c) {
-    return c.keys().then(function(reqs) {
-      for (var i = 0; i < reqs.length; i++) {
-        if (/\.html$|\/$/.test(new URL(reqs[i].url).pathname)) return c.match(reqs[i]);
-      }
-      return null;
-    });
+    return candidates.reduce(function(chain, u) {
+      return chain.then(function(found) {
+        return found || c.match(u, { ignoreVary: true, ignoreSearch: true });
+      });
+    }, Promise.resolve(null));
+  }).then(function(r) {
+    return r || new Response(
+      '<!DOCTYPE html><meta charset="utf-8"><body style="font:16px Georgia,serif;padding:40px">' +
+      'Pagina nu a fost salvată local încă. Deschide-o o dată cu internet pornit.</body>',
+      { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+    );
   });
 }
 
@@ -52,7 +70,6 @@ self.addEventListener('fetch', function(e) {
   var url = new URL(req.url);
 
   // Resursele externe raman in seama browserului
-  // (aplicatia nu foloseste niciuna: fonturile si iconurile sunt in fisier)
   if (url.origin !== self.location.origin) return;
 
   e.respondWith(
@@ -75,16 +92,7 @@ self.addEventListener('fetch', function(e) {
       // Fara copie locala: incercam reteaua
       return network.then(function(resp) {
         if (resp) return resp;
-        // Offline si fara copie exacta — la navigare servim aplicatia
-        if (req.mode === 'navigate') {
-          return appShell().then(function(shell) {
-            return shell || new Response(
-              '<!DOCTYPE html><meta charset="utf-8"><body style="font:16px Georgia,serif;padding:40px">' +
-              'Aplicatia nu a fost salvata local inca. Deschide-o o data cu internet pornit.</body>',
-              { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
-            );
-          });
-        }
+        if (req.mode === 'navigate') return offlineFallback(url);
         return new Response('', { status: 504 });
       });
     })

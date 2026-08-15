@@ -2609,12 +2609,14 @@ function updatePwaManifest() {
   // culorile ecranului de pornire urmeaza tema aleasa
   var th = buildTheme(getThemeColor());
   var startUrl = location.origin + location.pathname;
+  // teritoriul aplicatiei = folderul ei (/Wiki/), nu fisierul
+  var scopeUrl = location.origin + location.pathname.replace(/[^/]*$/, '');
   var manifest = {
     name: 'Wiki Personal',
     short_name: 'Wiki',
     description: 'Wiki personal offline',
     start_url: startUrl,
-    scope: location.origin + location.pathname,
+    scope: scopeUrl,
     display: 'standalone',
     background_color: th['--bg'],
     theme_color: th['--surface'],
