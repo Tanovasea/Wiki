@@ -1,6 +1,6 @@
-// Wiki Personal — Service Worker v20260815c
+// Wiki Personal — Service Worker v20260815e
 
-const CACHE = 'wiki-v20260815c';
+const CACHE = 'wiki-v20260815e';
 
 // Pagina e salvata sub toate numele sub care poate fi deschisa aplicatia
 // (radacina, wikitano.html, index.html). Daca unul lipseste, nu conteaza.
@@ -51,24 +51,8 @@ self.addEventListener('fetch', function(e) {
   if (!req.url.startsWith('http')) return;
   var url = new URL(req.url);
 
-  // Fonturile Google: cache-first, ca sa mearga si offline
-  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
-    e.respondWith(
-      fromCache(req).then(function(cached) {
-        if (cached) return cached;
-        return fetch(req).then(function(resp) {
-          if (resp && (resp.ok || resp.type === 'opaque')) {
-            var c2 = resp.clone();
-            caches.open(CACHE).then(function(c) { c.put(req, c2); });
-          }
-          return resp;
-        }).catch(function() { return new Response('', { status: 504 }); });
-      })
-    );
-    return;
-  }
-
-  // Restul resurselor externe raman in seama browserului
+  // Resursele externe raman in seama browserului
+  // (aplicatia nu foloseste niciuna: fonturile si iconurile sunt in fisier)
   if (url.origin !== self.location.origin) return;
 
   e.respondWith(
