@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ro">
+<html lang="ro" class="booting">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
@@ -8,9 +8,14 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wiki Personal">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- media="print" -> stylesheet-ul nu blocheaza prima afisare; devine activ dupa incarcare -->
+<link rel="stylesheet" media="print" onload="this.media='all'"
+      href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap">
 <title>Wiki Personal</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap');
+  /* Fonturile se incarca din <head>, non-blocant (vezi link rel=stylesheet). */
 
   :root {
     --bg: #c8bfae;
@@ -630,6 +635,11 @@
   .dd-tab-close:active { opacity: 1; color: var(--danger); }
 
   #main { padding: 60px 0 80px; min-height: 100vh; }
+
+  /* PORNIRE: continutul apare doar dupa ce datele sunt incarcate, ca sa nu
+     se vada starea goala (📖) inainte de pagina reala. */
+  #view-mode, #edit-mode { transition: opacity .14s ease-out; }
+  html.booting #view-mode, html.booting #edit-mode { opacity: 0; }
 </style>
 </head>
 <body>
@@ -1493,6 +1503,9 @@ function appInit() {
     else if (initOrder.length) navigate(initOrder[0]);
     else { updateBreadcrumb(); updatePageBreadcrumb(null); }
   }
+
+  // datele sunt gata — afiseaza continutul
+  document.documentElement.classList.remove('booting');
 }
 
 // ── PORNIRE APLICATIE ──
@@ -2283,6 +2296,31 @@ var THEMES = {
     '--text':'#e1e1e1','--text-dim':'#a0a0a0','--link':'#cf6679','--danger':'#cf6679'
   }
 };
+
+// ── ASPECT LA PORNIRE ──
+// Tema si marimea textului se aplicau abia in appInit(), adica dupa ce se
+// deschidea baza de date. Le aplicam sincron, inainte de prima afisare.
+(function bootAppearance() {
+  try {
+    var theme = THEMES[localStorage.getItem('wiki_theme') || 'sepia'];
+    if (theme) {
+      var root = document.documentElement;
+      Object.keys(theme).forEach(function(k) { root.style.setProperty(k, theme[k]); });
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute('content', theme['--surface']);
+    }
+    var vm = document.getElementById('view-mode');
+    if (vm) {
+      var saved = parseInt(localStorage.getItem('wiki_font_idx') || '2', 10);
+      if (!isNaN(saved)) fontIdx = Math.max(0, Math.min(FONT_SIZES.length - 1, saved));
+      vm.style.fontSize   = FONT_SIZES[fontIdx] + 'px';
+      vm.style.fontWeight = localStorage.getItem('wiki_font_weight') || 'normal';
+      vm.style.lineHeight = localStorage.getItem('wiki_line_height') || '1.55';
+    }
+  } catch (e) {}
+  // plasa de siguranta: daca pornirea esueaza, continutul se arata oricum
+  setTimeout(function() { document.documentElement.classList.remove('booting'); }, 3000);
+})();
 
 // ── ICON MANAGER ──
 // Iconurile PWA sunt PNG. Chrome ignora iconurile SVG din manifest: cand nu

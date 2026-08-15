@@ -1,6 +1,6 @@
-// Wiki Personal — Service Worker v20260815
+// Wiki Personal — Service Worker v20260815b
 
-const CACHE = 'wiki-v20260815';
+const CACHE = 'wiki-v20260815b';
 
 self.addEventListener('install', function(e) {
   e.waitUntil(
@@ -24,7 +24,26 @@ self.addEventListener('fetch', function(e) {
   if (e.request.method !== 'GET') return;
   if (!e.request.url.startsWith('http')) return;
   var url = new URL(e.request.url);
-  // Doar fisiere locale — ignora resurse externe
+
+  // Fonturile Google: cache-first, ca aplicatia sa nu astepte reteaua la
+  // fiecare pornire (si ca sa functioneze si offline).
+  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
+    e.respondWith(
+      caches.match(e.request).then(function(cached) {
+        if (cached) return cached;
+        return fetch(e.request).then(function(resp) {
+          if (resp && (resp.ok || resp.type === 'opaque')) {
+            var c2 = resp.clone();
+            caches.open(CACHE).then(function(c) { c.put(e.request, c2); });
+          }
+          return resp;
+        }).catch(function() { return new Response('', { status: 504 }); });
+      })
+    );
+    return;
+  }
+
+  // Doar fisiere locale — ignora restul resurselor externe
   if (url.origin !== self.location.origin) return;
 
   e.respondWith(
