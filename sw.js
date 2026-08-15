@@ -1,13 +1,18 @@
-// Wiki Personal — Service Worker v20260815b
+// Wiki Personal — Service Worker v20260815c
 
-const CACHE = 'wiki-v20260815b';
+const CACHE = 'wiki-v20260815c';
+
+// Pagina e salvata sub toate numele sub care poate fi deschisa aplicatia
+// (radacina, wikitano.html, index.html). Daca unul lipseste, nu conteaza.
+const PRECACHE = ['./', './wikitano.html', './index.html'];
 
 self.addEventListener('install', function(e) {
   e.waitUntil(
     caches.open(CACHE).then(function(c) {
-      return c.add('./wikitano.html').catch(function() {
-        return c.add('./');
-      });
+      return Promise.all(PRECACHE.map(function(u) {
+        // cache:'reload' = ia fisierul de la server, nu din cache-ul browserului
+        return c.add(new Request(u, { cache: 'reload' })).catch(function() { return null; });
+      }));
     }).then(function() { return self.skipWaiting(); })
   );
 });
@@ -20,21 +25,41 @@ self.addEventListener('activate', function(e) {
   );
 });
 
-self.addEventListener('fetch', function(e) {
-  if (e.request.method !== 'GET') return;
-  if (!e.request.url.startsWith('http')) return;
-  var url = new URL(e.request.url);
+// Cautare in cache tolerantă: ignoreVary evita ratarile cand serverul trimite
+// antetul Vary, ignoreSearch acopera adresele cu ?parametri.
+function fromCache(req) {
+  return caches.match(req, { ignoreVary: true }).then(function(r) {
+    return r || caches.match(req, { ignoreVary: true, ignoreSearch: true });
+  });
+}
 
-  // Fonturile Google: cache-first, ca aplicatia sa nu astepte reteaua la
-  // fiecare pornire (si ca sa functioneze si offline).
+// Ultima plasa de siguranta pentru navigare: orice copie a aplicatiei
+function appShell() {
+  return caches.open(CACHE).then(function(c) {
+    return c.keys().then(function(reqs) {
+      for (var i = 0; i < reqs.length; i++) {
+        if (/\.html$|\/$/.test(new URL(reqs[i].url).pathname)) return c.match(reqs[i]);
+      }
+      return null;
+    });
+  });
+}
+
+self.addEventListener('fetch', function(e) {
+  var req = e.request;
+  if (req.method !== 'GET') return;
+  if (!req.url.startsWith('http')) return;
+  var url = new URL(req.url);
+
+  // Fonturile Google: cache-first, ca sa mearga si offline
   if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
     e.respondWith(
-      caches.match(e.request).then(function(cached) {
+      fromCache(req).then(function(cached) {
         if (cached) return cached;
-        return fetch(e.request).then(function(resp) {
+        return fetch(req).then(function(resp) {
           if (resp && (resp.ok || resp.type === 'opaque')) {
             var c2 = resp.clone();
-            caches.open(CACHE).then(function(c) { c.put(e.request, c2); });
+            caches.open(CACHE).then(function(c) { c.put(req, c2); });
           }
           return resp;
         }).catch(function() { return new Response('', { status: 504 }); });
@@ -43,22 +68,41 @@ self.addEventListener('fetch', function(e) {
     return;
   }
 
-  // Doar fisiere locale — ignora restul resurselor externe
+  // Restul resurselor externe raman in seama browserului
   if (url.origin !== self.location.origin) return;
 
   e.respondWith(
-    caches.match(e.request).then(function(cached) {
-      // Actualizeaza in fundal
-      var fetchPromise = fetch(e.request).then(function(resp) {
-        if (resp && resp.status === 200) {
+    fromCache(req).then(function(cached) {
+      var network = fetch(req).then(function(resp) {
+        // raspunsurile redirectionate nu se pun in cache: nu pot fi refolosite la navigare
+        if (resp && resp.status === 200 && !resp.redirected) {
           var clone = resp.clone();
-          caches.open(CACHE).then(function(c) { c.put(e.request, clone); });
+          caches.open(CACHE).then(function(c) { c.put(req, clone); });
         }
         return resp;
       }).catch(function() { return null; });
 
-      // Cache-first: daca e in cache raspunde imediat
-      return cached || fetchPromise || new Response('Offline.', {status:503});
+      // Avem copie locala: raspundem imediat si actualizam in fundal
+      if (cached) {
+        e.waitUntil(network);
+        return cached;
+      }
+
+      // Fara copie locala: incercam reteaua
+      return network.then(function(resp) {
+        if (resp) return resp;
+        // Offline si fara copie exacta — la navigare servim aplicatia
+        if (req.mode === 'navigate') {
+          return appShell().then(function(shell) {
+            return shell || new Response(
+              '<!DOCTYPE html><meta charset="utf-8"><body style="font:16px Georgia,serif;padding:40px">' +
+              'Aplicatia nu a fost salvata local inca. Deschide-o o data cu internet pornit.</body>',
+              { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+            );
+          });
+        }
+        return new Response('', { status: 504 });
+      });
     })
   );
 });
