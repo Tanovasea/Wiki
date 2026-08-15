@@ -2729,12 +2729,42 @@ function runDiagnostic() {
       });
     })).then(function() {
       lines.push('Proiect activ: ' + (loadActiveProject() || 'nesetat'));
+
+      // urme lasate de versiunile vechi, in localStorage
+      var ls = [], hints = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k.indexOf('wiki_') !== 0) continue;
+        ls.push(k);
+        if (k.indexOf('wiki_last_') === 0 || k.indexOf('wiki_node_') === 0 ||
+            k.indexOf('wiki_autosave_') === 0 || k === 'wiki_projects_v1' || k === 'wiki_pages_v1') {
+          hints.push(k);
+        }
+      }
+      lines.push('Chei wiki_ în localStorage: ' + ls.length);
+      if (hints.length) {
+        lines.push('Urme de pagini vechi:');
+        hints.slice(0, 12).forEach(function(h) { lines.push('  · ' + h); });
+        if (hints.length > 12) lines.push('  · … și încă ' + (hints.length - 12));
+      } else {
+        lines.push('Urme de pagini vechi: niciuna');
+      }
       var persisted = navigator.storage && navigator.storage.persisted
         ? navigator.storage.persisted() : Promise.resolve(null);
       return persisted.then(function(p) {
         lines.push('Protejat de ștergerea automată: ' +
                    (p === true ? 'DA' : p === false ? 'NU — Android poate șterge datele' : 'necunoscut'));
-        out.innerHTML = lines.map(function(l) { return l.replace(/ /g, '&nbsp;'); }).join('<br>');
+        // exista si alte baze de date pe acest domeniu?
+        var dbs = indexedDB.databases ? indexedDB.databases() : Promise.resolve(null);
+        return dbs.then(function(list) {
+          if (list) {
+            lines.push('Baze de date pe acest domeniu: ' +
+              (list.length ? list.map(function(d) { return d.name; }).join(', ') : 'niciuna'));
+          }
+        }).catch(function() {}).then(function() {
+          lines.push('Adresă: ' + location.origin);
+          out.innerHTML = lines.map(function(l) { return l.replace(/ /g, '&nbsp;'); }).join('<br>');
+        });
       });
     });
   }).catch(function(e) {
