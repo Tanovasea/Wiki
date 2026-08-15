@@ -9,6 +9,42 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wiki Personal">
 <script>
+// Tema se aplica inainte de prima afisare. Altfel pagina apare intai in sepia
+// (valorile implicite din CSS) si abia apoi trece la tema aleasa — se vedea
+// ca o schimbare de culoare la deschidere.
+window.THEMES = {
+  sepia: {
+    '--bg':'#c8bfae','--surface':'#bdb3a2','--surface2':'#b2a896',
+    '--border':'#9a8e7e','--accent':'#6a4c2a','--accent2':'#3a6a7a',
+    '--text':'#1e1810','--text-dim':'#6a5a48','--link':'#8b2a2a','--danger':'#b04040'
+  },
+  paper: {
+    '--bg':'#f2ede4','--surface':'#e8e2d8','--surface2':'#ddd7cc',
+    '--border':'#c4b9a8','--accent':'#5a3c1a','--accent2':'#2a5a6a',
+    '--text':'#1a1208','--text-dim':'#7a6a58','--link':'#7a2020','--danger':'#a03030'
+  },
+  warm: {
+    '--bg':'#2a2218','--surface':'#342c20','--surface2':'#3e3428',
+    '--border':'#554838','--accent':'#c8a878','--accent2':'#78a8b8',
+    '--text':'#e8dcc8','--text-dim':'#a89880','--link':'#d4907a','--danger':'#d07070'
+  },
+  dark: {
+    '--bg':'#121212','--surface':'#1e1e1e','--surface2':'#2c2c2c',
+    '--border':'#383838','--accent':'#bb86fc','--accent2':'#03dac6',
+    '--text':'#e1e1e1','--text-dim':'#a0a0a0','--link':'#cf6679','--danger':'#cf6679'
+  }
+};
+(function applyStoredTheme() {
+  try {
+    var t = window.THEMES[localStorage.getItem('wiki_theme') || 'sepia'];
+    if (!t) return;
+    var r = document.documentElement;
+    for (var k in t) r.style.setProperty(k, t[k]);
+    var m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.setAttribute('content', t['--surface']);
+  } catch (e) {}
+})();
+
 // Fonturile sunt incorporate in fisier (@font-face cu date incluse), deci nu
 // se asteapta reteaua — doar randarea lor, ca sa nu se vada schimbarea de font.
 window.fontsReady = new Promise(function(resolve) {
@@ -1062,6 +1098,14 @@ function dataUrlToBlob(dataUrl) {
 // Converteste Blob → Object URL (pentru <img src>)
 // Retine o cache de objectURL-uri pentru a nu recrea la fiecare render
 var imgUrlCache = {};
+// Imaginile paginii se incarca din baza de date dupa randare. La pornire le
+// asteptam, altfel continutul sare in jos cand apar.
+var pendingImageLoads = [];
+function imagesSettled() {
+  var list = pendingImageLoads.slice();
+  pendingImageLoads.length = 0;
+  return Promise.all(list).catch(function() {});
+}
 
 function imgGetUrl(id) {
   if (imgUrlCache[id]) return Promise.resolve(imgUrlCache[id]);
@@ -1478,7 +1522,7 @@ function appInit() {
   });
   document.getElementById('search-input-field').addEventListener('input', onSearchInput);
 
-  checkStorageWarning();
+  setTimeout(checkStorageWarning, 2000); // banner informativ, dupa deschidere
   requestPersistentStorage();
   initFontSize();
   initSettings();
@@ -2085,12 +2129,17 @@ function renderView(title, hlQuery, hlIndex) {
       if (!el2) return;
       var caption = img.caption || '';
       if (img.id) {
-        imgGetUrl(img.id).then(function(url) {
-          if (el2 && url) {
-            el2.src = url;
-            el2.onclick = function(){ openLightbox(url, caption); };
-          }
-        });
+        pendingImageLoads.push(imgGetUrl(img.id).then(function(url) {
+          if (!el2 || !url) return;
+          el2.src = url;
+          el2.onclick = function(){ openLightbox(url, caption); };
+          if (el2.complete) return;
+          return new Promise(function(res) {
+            el2.addEventListener('load', res, { once: true });
+            el2.addEventListener('error', res, { once: true });
+            setTimeout(res, 600); // imaginile din afara ecranului nu se incarca acum
+          });
+        }).catch(function() {}));
       } else if (img.data) {
         // imagine veche base64
         el2.onclick = function(){ openLightbox(img.data, caption); };
@@ -2299,28 +2348,8 @@ function changeFontSize(delta) {
 }
 
 // ── SETĂRI ──
-var THEMES = {
-  sepia: {
-    '--bg':'#c8bfae','--surface':'#bdb3a2','--surface2':'#b2a896',
-    '--border':'#9a8e7e','--accent':'#6a4c2a','--accent2':'#3a6a7a',
-    '--text':'#1e1810','--text-dim':'#6a5a48','--link':'#8b2a2a','--danger':'#b04040'
-  },
-  paper: {
-    '--bg':'#f2ede4','--surface':'#e8e2d8','--surface2':'#ddd7cc',
-    '--border':'#c4b9a8','--accent':'#5a3c1a','--accent2':'#2a5a6a',
-    '--text':'#1a1208','--text-dim':'#7a6a58','--link':'#7a2020','--danger':'#a03030'
-  },
-  warm: {
-    '--bg':'#2a2218','--surface':'#342c20','--surface2':'#3e3428',
-    '--border':'#554838','--accent':'#c8a878','--accent2':'#78a8b8',
-    '--text':'#e8dcc8','--text-dim':'#a89880','--link':'#d4907a','--danger':'#d07070'
-  },
-  dark: {
-    '--bg':'#121212','--surface':'#1e1e1e','--surface2':'#2c2c2c',
-    '--border':'#383838','--accent':'#bb86fc','--accent2':'#03dac6',
-    '--text':'#e1e1e1','--text-dim':'#a0a0a0','--link':'#cf6679','--danger':'#cf6679'
-  }
-};
+// Definit in <head>, ca tema sa fie aplicata inainte de prima afisare.
+var THEMES = window.THEMES;
 
 // ── ASPECT LA PORNIRE ──
 // Tema si marimea textului se aplicau abia in appInit(), adica dupa ce se
@@ -2338,22 +2367,18 @@ function revealApp() {
 // Asteapta fonturile (max 1.2s) si lasa 160ms pentru restaurarea pozitiei
 // paginii si a bannerelor, apoi afiseaza tot dintr-o data.
 function revealAppWhenReady() {
-  var fonts = window.fontsReady || Promise.resolve();
+  var fonts  = window.fontsReady || Promise.resolve();
   var settle = new Promise(function(r) { setTimeout(r, 160); });
-  Promise.all([fonts, settle]).then(function() {
+  var cap    = new Promise(function(r) { setTimeout(r, 800); });
+  var imgs   = Promise.race([imagesSettled(), cap]);
+  Promise.all([fonts, settle, imgs]).then(function() {
     requestAnimationFrame(function() { requestAnimationFrame(revealApp); });
   }).catch(revealApp);
 }
 
 (function bootAppearance() {
+  // tema e deja aplicata din <head>; aici raman doar setarile de text
   try {
-    var theme = THEMES[localStorage.getItem('wiki_theme') || 'sepia'];
-    if (theme) {
-      var root = document.documentElement;
-      Object.keys(theme).forEach(function(k) { root.style.setProperty(k, theme[k]); });
-      var meta = document.querySelector('meta[name="theme-color"]');
-      if (meta) meta.setAttribute('content', theme['--surface']);
-    }
     var vm = document.getElementById('view-mode');
     if (vm) {
       var saved = parseInt(localStorage.getItem('wiki_font_idx') || '2', 10);
@@ -2468,6 +2493,8 @@ function updatePwaManifestIcon(iconUrl, maskUrl) {
   var appleIcon = document.querySelector('link[rel="apple-touch-icon"]');
   var favicon   = document.querySelector('link[rel="icon"]');
 
+  // culorile ecranului de pornire urmeaza tema aleasa
+  var th = THEMES[localStorage.getItem('wiki_theme') || 'sepia'] || THEMES.sepia;
   var startUrl = location.origin + location.pathname;
   var manifest = {
     name: 'Wiki Personal',
@@ -2476,8 +2503,8 @@ function updatePwaManifestIcon(iconUrl, maskUrl) {
     start_url: startUrl,
     scope: location.origin + location.pathname,
     display: 'standalone',
-    background_color: '#c8bfae',
-    theme_color: '#6a4c2a',
+    background_color: th['--bg'],
+    theme_color: th['--surface'],
     orientation: 'portrait-primary',
     icons: buildManifestIcons(iconUrl, maskUrl)
   };
@@ -2644,6 +2671,8 @@ function applySettingTheme(name) {
   var root = document.documentElement;
   Object.keys(theme).forEach(function(k) { root.style.setProperty(k, theme[k]); });
   localStorage.setItem('wiki_theme', name);
+  var meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', theme['--surface']);
   ['sepia','paper','warm'].forEach(function(t) {
     var btn = document.getElementById('theme-' + t);
     if (btn) btn.classList.toggle('active', t === name);

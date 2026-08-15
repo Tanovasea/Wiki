@@ -1,6 +1,6 @@
-// Wiki Personal — Service Worker v20260815e
+// Wiki Personal — Service Worker v20260815f
 
-const CACHE = 'wiki-v20260815e';
+const CACHE = 'wiki-v20260815f';
 
 // Pagina e salvata sub toate numele sub care poate fi deschisa aplicatia
 // (radacina, wikitano.html, index.html). Daca unul lipseste, nu conteaza.
