@@ -1046,6 +1046,12 @@ setTimeout(function() { document.documentElement.classList.remove('booting'); },
       <button class="settings-btn" onclick="exportWiki()">📤 Exportă acum</button>
     </div>
 
+    <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:8px;">
+      <span class="settings-label" style="margin-bottom:0;">Diagnostic</span>
+      <div id="diag-out" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);line-height:1.6;"></div>
+      <button class="settings-btn" onclick="runDiagnostic()">🔍 Verifică baza de date</button>
+    </div>
+
     <div class="settings-row" id="storage-info-row">
       <!-- populat de updateStorageInfo() -->
       <div id="storage-info-content" style="width:100%;">
@@ -1236,6 +1242,62 @@ function idbSet(key, value) {
   });
 }
 
+// Toate cheile din store — necesar ca sa gasim proiecte ramase fara index
+function idbKeys() {
+  return openDB().then(function(d) {
+    return new Promise(function(resolve) {
+      var st = d.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME);
+      if (st.getAllKeys) {
+        var req = st.getAllKeys();
+        req.onsuccess = function() { resolve(req.result || []); };
+        req.onerror   = function() { resolve([]); };
+        return;
+      }
+      var out = [], cur = st.openCursor();
+      cur.onsuccess = function(e) {
+        var c = e.target.result;
+        if (!c) return resolve(out);
+        out.push(c.key); c.continue();
+      };
+      cur.onerror = function() { resolve(out); };
+    });
+  }).catch(function() { return []; });
+}
+
+// Paginile fiecarui proiect stau in 'proj::Nume'. Lista proiectelor (wiki_meta)
+// e doar un index — daca se pierde, paginile raman, dar aplicatia pare goala.
+// Aici reconstruim indexul din inregistrarile care exista pe disc.
+function recoverOrphanProjects() {
+  return idbKeys().then(function(keys) {
+    var orphans = keys.filter(function(k) {
+      k = String(k);
+      return k.indexOf('proj::') === 0 && !allProjects[k.slice(6)];
+    });
+    if (!orphans.length) return false;
+    return Promise.all(orphans.map(function(k) {
+      var name = String(k).slice(6);
+      return idbGet(k).then(function(val) {
+        var data = null;
+        try { data = JSON.parse(val); } catch (e) {}
+        if (data && Object.keys(data).length) allProjects[name] = data;
+      });
+    })).then(function() {
+      dataReady = true;
+      return saveMeta().then(function() { return true; });
+    });
+  }).catch(function() { return false; });
+}
+
+// Proiectul cu cele mai multe pagini — folosit dupa o recuperare
+function projectWithMostPages() {
+  var best = null, n = -1;
+  Object.keys(allProjects).forEach(function(name) {
+    var c = Object.keys(allProjects[name] || {}).length;
+    if (c > n) { n = c; best = name; }
+  });
+  return best;
+}
+
 function idbDelete(key) {
   return openDB().then(function(d) {
     return new Promise(function(resolve) {
@@ -1302,6 +1364,11 @@ function loadMeta() {
 
 // ── DATE PROIECT (continut complet) ──
 function saveProjectData(projName, data) {
+  // Protectie: nu scriem nimic inainte ca datele existente sa fie citite
+  if (typeof dataReady !== 'undefined' && !dataReady) {
+    console.warn('Salvare blocată — datele nu au fost încă încărcate.');
+    return Promise.resolve();
+  }
   return idbSet('proj::' + projName, JSON.stringify(data)).then(function() {
     checkStorageWarning();
   });
@@ -1612,6 +1679,23 @@ function appInit() {
 }
 
 // ── PORNIRE APLICATIE ──
+// dataReady devine true doar dupa ce datele au fost efectiv citite. Pana atunci
+// nicio salvare nu are voie sa scrie peste ce e in baza de date.
+var dataReady = false;
+
+// O eroare in interfata nu trebuie sa duca aplicatia pe ramura "fara date",
+// pentru ca o editare ulterioara ar suprascrie proiectul real cu unul gol.
+function safeAppInit() {
+  dataReady = true;
+  try {
+    appInit();
+  } catch (err) {
+    console.error('Eroare la pornire:', err);
+    revealApp();
+    try { toast('⚠️ Eroare la pornire: ' + err.message); } catch (e) {}
+  }
+}
+
 openDB().then(function() {
   activeProject = loadActiveProject();
 
@@ -1629,7 +1713,18 @@ openDB().then(function() {
           allProjects[projToLoad] = {};
         }
         activeProject = projToLoad;
-        appInit();
+        // verifica daca exista proiecte care nu mai apar in index
+        return recoverOrphanProjects().then(function(fixed) {
+          if (fixed) {
+            var pagesNow = Object.keys(allProjects[activeProject] || {}).length;
+            if (pagesNow === 0) {
+              var best = projectWithMostPages();
+              if (best) { activeProject = best; saveActiveProject(best); }
+            }
+            setTimeout(function() { toast('✓ Am recuperat proiecte lipsă din listă.'); }, 800);
+          }
+          safeAppInit();
+        });
       });
     }
 
@@ -1643,7 +1738,7 @@ openDB().then(function() {
           return migrateOldFormat(oldData).then(function() {
             toast('✓ Date migrate în format nou (mai rapid)');
             activeProject = loadActiveProject() || Object.keys(oldData)[0];
-            appInit();
+            safeAppInit();
           });
         }
       }
@@ -1664,26 +1759,39 @@ openDB().then(function() {
         return migrateOldFormat(lsData).then(function() {
           toast('✓ Date migrate din localStorage');
           activeProject = Object.keys(lsData)[0];
-          appInit();
+          safeAppInit();
         });
       }
 
-      // Aplicatie noua — fara date
-      allProjects = { 'Proiect 1': {} };
-      activeProject = 'Proiect 1';
-      saveActiveProject(activeProject);
-      saveMeta();
-      appInit();
+      // Inainte de a declara aplicatia goala: mai exista pagini pe disc?
+      return recoverOrphanProjects().then(function(fixed) {
+        if (fixed) {
+          activeProject = projectWithMostPages() || Object.keys(allProjects)[0];
+          saveActiveProject(activeProject);
+          setTimeout(function() { toast('✓ Date recuperate din memorie.'); }, 800);
+          return safeAppInit();
+        }
+        // chiar nu exista date
+        allProjects = { 'Proiect 1': {} };
+        activeProject = 'Proiect 1';
+        dataReady = true;
+        saveActiveProject(activeProject);
+        saveMeta();
+        safeAppInit();
+      });
     });
   });
 }).catch(function(err) {
-  // IDB indisponibil — fallback la localStorage
+  // IDB indisponibil — fallback la localStorage.
+  // Daca datele erau deja incarcate, NU le inlocuim: eroarea e din alta parte.
   console.warn('IDB error:', err);
-  var lsData = null;
-  try { var r = localStorage.getItem('wiki_projects_v1'); if(r) lsData = JSON.parse(r); } catch(e) {}
-  allProjects = lsData || { 'Proiect 1': {} };
-  activeProject = loadActiveProject() || Object.keys(allProjects)[0];
-  appInit();
+  if (Object.keys(allProjects).length === 0) {
+    var lsData = null;
+    try { var r = localStorage.getItem('wiki_projects_v1'); if(r) lsData = JSON.parse(r); } catch(e) {}
+    allProjects = lsData || { 'Proiect 1': {} };
+    activeProject = loadActiveProject() || Object.keys(allProjects)[0];
+  }
+  safeAppInit();
 });
 
 // ── STATE ──
@@ -2539,6 +2647,8 @@ function openSettings() {
   updateStorageInfo();
   renderBackupInfo();
   renderPalette();
+  var dg = document.getElementById('diag-out');
+  if (dg) dg.textContent = '';
 }
 
 function toggleLockFromSettings() {
@@ -2597,6 +2707,38 @@ function renderPalette() {
       b.onclick = function() { applyThemeColor(hex); };
       box.appendChild(b);
     });
+  });
+}
+
+// ── DIAGNOSTIC ──
+// Arata exact ce e in baza de date, ca sa se vada daca datele exista.
+function runDiagnostic() {
+  var out = document.getElementById('diag-out');
+  if (!out) return;
+  out.textContent = 'Se citește…';
+  idbKeys().then(function(keys) {
+    var projKeys = keys.filter(function(k) { return String(k).indexOf('proj::') === 0; });
+    var lines = ['Înregistrări în baza de date: ' + keys.length,
+                 'Index proiecte (wiki_meta): ' + (keys.indexOf('wiki_meta') >= 0 ? 'există' : 'LIPSEȘTE'),
+                 'Proiecte pe disc: ' + projKeys.length];
+    return Promise.all(projKeys.map(function(k) {
+      return idbGet(k).then(function(v) {
+        var n = 0;
+        try { n = Object.keys(JSON.parse(v)).length; } catch (e) {}
+        lines.push('  · ' + String(k).slice(6) + ' — ' + n + ' pagini');
+      });
+    })).then(function() {
+      lines.push('Proiect activ: ' + (loadActiveProject() || 'nesetat'));
+      var persisted = navigator.storage && navigator.storage.persisted
+        ? navigator.storage.persisted() : Promise.resolve(null);
+      return persisted.then(function(p) {
+        lines.push('Protejat de ștergerea automată: ' +
+                   (p === true ? 'DA' : p === false ? 'NU — Android poate șterge datele' : 'necunoscut'));
+        out.innerHTML = lines.map(function(l) { return l.replace(/ /g, '&nbsp;'); }).join('<br>');
+      });
+    });
+  }).catch(function(e) {
+    out.textContent = 'Eroare: ' + (e && e.message || e);
   });
 }
 
